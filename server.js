@@ -7,7 +7,7 @@ const OpenAI = require('openai');
 
 // Initialize OpenAI with API key from environment variable
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+    apiKey: process.env.APIKEY
 });
 
 app.use(express.json());
@@ -80,4 +80,5 @@ app.post('/chat', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log('API Key status:', process.env.APIKEY ? 'Present' : 'Missing');
 });

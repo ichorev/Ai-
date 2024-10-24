@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: chatgpt-interface
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: APIKEY
+        sync: false
+    nodeVersion: 18

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatGPT Interface</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        #chatbox {
+            height: 400px;
+            border: 1px solid #ccc;
+            margin-bottom: 20px;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        #inputArea {
+            display: flex;
+            gap: 10px;
+        }
+        #messageInput {
+            flex-grow: 1;
+            padding: 8px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20px;
+        }
+        .bot-message {
+            background-color: #f5f5f5;
+            margin-right: 20px;
+        }
+        #accessForm {
+            margin-bottom: 20px;
+        }
+        #chatInterface {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>ChatGPT Interface</h1>
+    
+    <div id="accessForm">
+        <input type="text" id="accessCode" placeholder="Enter access code">
+        <button onclick="verifyAccess()">Submit</button>
+    </div>
+
+    <div id="chatInterface">
+        <div id="chatbox"></div>
+        <div id="inputArea">
+            <input type="text" id="messageInput" placeholder="Type your message...">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        let currentAccessCode = '';
+
+        async function verifyAccess() {
+            const accessCode = document.getElementById('accessCode').value;
+            
+            try {
+                const response = await fetch('/verify-access', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ accessCode })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('accessForm').style.display = 'none';
+                    document.getElementById('chatInterface').style.display = 'block';
+                    currentAccessCode = accessCode;
+                } else {
+                    alert('Invalid access code');
+                }
+            } catch (error) {
+                alert('Error verifying access code');
+            }
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const message = messageInput.value.trim();
+            
+            if (!message) return;
+
+            // Add user message to chat
+            addMessageToChat('You: ' + message, 'user-message');
+            messageInput.value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message,
+                        accessCode: currentAccessCode
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessageToChat('ChatGPT: ' + data.response, 'bot-message');
+                } else {
+                    alert(data.error || 'Error sending message');
+                }
+            } catch (error) {
+                alert('Error communicating with server');
+            }
+        }
+
+        function addMessageToChat(message, className) {
+            const chatbox = document.getElementById('chatbox');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${className}`;
+            messageDiv.textContent = message;
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        // Allow sending message with Enter key
+        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

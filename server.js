@@ -5,9 +5,15 @@ const app = express();
 // Import OpenAI
 const OpenAI = require('openai');
 
+// Check for API key
+if (!process.env.Apikey) {
+    console.error('ERROR: Apikey environment variable is missing');
+    process.exit(1);
+}
+
 // Initialize OpenAI with API key from environment variable
 const openai = new OpenAI({
-    apiKey: process.env.APIKEY
+    apiKey: process.env.Apikey.trim() // Ensure no whitespace
 });
 
 app.use(express.json());
@@ -60,8 +66,10 @@ app.post('/chat', async (req, res) => {
 
     try {
         const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [{ role: "user", content: message }]
+            model: "gpt-4-0125-preview",
+            messages: [{ role: "user", content: message }],
+            max_tokens: 4000,
+            temperature: 0.7,
         });
 
         res.json({
@@ -70,9 +78,17 @@ app.post('/chat', async (req, res) => {
         });
     } catch (error) {
         console.error('OpenAI API Error:', error);
+        let errorMessage = 'Error communicating with ChatGPT';
+        
+        if (error.message.includes('insufficient_quota')) {
+            errorMessage = 'API quota exceeded. Please try again later.';
+        } else if (error.message.includes('model not found')) {
+            errorMessage = 'Model access not available. Please check your API key permissions.';
+        }
+        
         res.json({
             success: false,
-            error: 'Error communicating with ChatGPT'
+            error: errorMessage
         });
     }
 });
@@ -80,5 +96,6 @@ app.post('/chat', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log('API Key status:', process.env.APIKEY ? 'Present' : 'Missing');
+    console.log('API Key:', process.env.Apikey ? 'Present (length: ' + process.env.Apikey.length + ')' : 'Missing');
+    console.log('Using GPT-4-0125-preview model (4-mini)');
 });

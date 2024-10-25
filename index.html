@@ -87,6 +87,11 @@
             background-color: #1557b0;
         }
 
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
         .message {
             margin: 10px 0;
             padding: 12px;
@@ -121,6 +126,9 @@
             color: #666;
             font-size: 0.9em;
             margin: 10px 0;
+            padding: 5px;
+            background-color: #e8f0fe;
+            border-radius: 5px;
         }
 
         .premium-info {
@@ -142,7 +150,15 @@
         }
 
         #usageCounter {
+            background-color: #e3f2fd;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-weight: bold;
             color: #1a73e8;
+        }
+
+        .usage-warning {
+            color: #d32f2f;
             font-weight: bold;
         }
     </style>
@@ -152,7 +168,7 @@
         <h1>Talk to AI - Premium Chat Experience</h1>
         
         <div class="info-section">
-            <p>Welcome! You can start with a free trial access code: <span class="code-display">TRIAL10</span></p>
+            <p>Welcome! You can start with a free trial access code: <span class="code-display">TEST5</span></p>
             <p>This code gives you 5 free uses to experience our advanced AI chat system.</p>
         </div>
 
@@ -162,13 +178,13 @@
         </div>
 
         <div id="chatInterface">
-            <div id="chatbox"></div>
             <div class="usage-info">
-                Remaining uses: <span id="usageCounter">5</span>
+                Remaining uses: <span id="usageCounter">-</span>
             </div>
+            <div id="chatbox"></div>
             <div id="inputArea">
                 <input type="text" id="messageInput" placeholder="Type your message here...">
-                <button onclick="sendMessage()">Send</button>
+                <button onclick="sendMessage()" id="sendButton">Send</button>
             </div>
         </div>
 
@@ -186,10 +202,15 @@
 
     <script>
         let currentAccessCode = '';
-        let usesRemaining = 5;
+        let usesRemaining = 0;
 
         async function verifyAccess() {
-            const accessCode = document.getElementById('accessCode').value;
+            const accessCode = document.getElementById('accessCode').value.trim();
+            
+            if (!accessCode) {
+                alert('Please enter an access code');
+                return;
+            }
             
             try {
                 const response = await fetch('/verify-access', {
@@ -206,17 +227,15 @@
                     document.getElementById('accessForm').style.display = 'none';
                     document.getElementById('chatInterface').style.display = 'block';
                     currentAccessCode = accessCode;
-                    
-                    // Update usage counter if available
-                    if (data.usesLeft !== undefined) {
-                        usesRemaining = data.usesLeft;
-                        updateUsageCounter();
-                    }
+                    usesRemaining = data.usesLeft;
+                    updateUsageDisplay();
+                    addMessageToChat('AI: Welcome! How can I help you today?', 'bot-message');
                 } else {
                     alert('Invalid access code');
                 }
             } catch (error) {
                 alert('Error verifying access code');
+                console.error('Verification error:', error);
             }
         }
 
@@ -225,6 +244,13 @@
             const message = messageInput.value.trim();
             
             if (!message) return;
+            if (usesRemaining <= 0 && usesRemaining !== Infinity) {
+                alert('No uses remaining. Please contact us for more access.');
+                return;
+            }
+
+            const sendButton = document.getElementById('sendButton');
+            sendButton.disabled = true;
 
             addMessageToChat('You: ' + message, 'user-message');
             messageInput.value = '';
@@ -245,17 +271,38 @@
                 
                 if (data.success) {
                     addMessageToChat('AI: ' + data.response, 'bot-message');
-                    
-                    // Update usage counter if available
-                    if (data.usesLeft !== undefined) {
-                        usesRemaining = data.usesLeft;
-                        updateUsageCounter();
-                    }
+                    usesRemaining = data.usesLeft;
+                    updateUsageDisplay();
                 } else {
                     alert(data.error || 'Error sending message');
                 }
             } catch (error) {
                 alert('Error communicating with server');
+                console.error('Send message error:', error);
+            } finally {
+                sendButton.disabled = false;
+            }
+        }
+
+        function updateUsageDisplay() {
+            const counter = document.getElementById('usageCounter');
+            const usageText = usesRemaining === Infinity ? 'Unlimited' : usesRemaining;
+            counter.textContent = usageText;
+
+            if (usesRemaining !== Infinity && usesRemaining <= 2) {
+                counter.classList.add('usage-warning');
+            } else {
+                counter.classList.remove('usage-warning');
+            }
+
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            const disabled = usesRemaining !== Infinity && usesRemaining <= 0;
+            messageInput.disabled = disabled;
+            sendButton.disabled = disabled;
+
+            if (disabled) {
+                addMessageToChat('AI: You have run out of uses. Please contact us for more access.', 'bot-message usage-warning');
             }
         }
 
@@ -268,20 +315,16 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
-        function updateUsageCounter() {
-            const counter = document.getElementById('usageCounter');
-            counter.textContent = usesRemaining === Infinity ? 'Unlimited' : usesRemaining;
-        }
-
-        // Enter key handlers
         document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 sendMessage();
             }
         });
 
         document.getElementById('accessCode').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
+                e.preventDefault();
                 verifyAccess();
             }
         });

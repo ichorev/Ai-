@@ -3,69 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>talk to AI</title>
+    <title>Talk to AI - Advanced Chat Interface</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 0 20px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
         }
-        #chatbox {
-            height: 400px;
-            border: 1px solid #ccc;
+
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #1a73e8;
+            text-align: center;
             margin-bottom: 20px;
-            padding: 10px;
-            overflow-y: auto;
         }
+
+        .info-section {
+            background-color: #e8f0fe;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-left: 4px solid #1a73e8;
+        }
+
+        .code-display {
+            background-color: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            color: #1a73e8;
+            font-size: 1.2em;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        #chatbox {
+            height: 500px;
+            border: 1px solid #e1e4e8;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #fff;
+        }
+
         #inputArea {
             display: flex;
             gap: 10px;
+            margin-top: 15px;
         }
+
+        input {
+            padding: 12px;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
         #messageInput {
             flex-grow: 1;
-            padding: 8px;
         }
+
+        button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #1557b0;
+        }
+
         .message {
             margin: 10px 0;
-            padding: 8px;
-            border-radius: 5px;
+            padding: 12px;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
         }
+
         .user-message {
             background-color: #e3f2fd;
-            margin-left: 20px;
+            margin-left: auto;
+            color: #1557b0;
         }
+
         .bot-message {
             background-color: #f5f5f5;
-            margin-right: 20px;
+            margin-right: auto;
+            color: #333;
         }
+
         #accessForm {
-            margin-bottom: 20px;
+            text-align: center;
+            margin: 20px 0;
         }
+
         #chatInterface {
             display: none;
+        }
+
+        .usage-info {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin: 10px 0;
+        }
+
+        .premium-info {
+            background-color: #fff3e0;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            border-left: 4px solid #ff9800;
+        }
+
+        .contact-info {
+            color: #1a73e8;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .contact-info:hover {
+            text-decoration: underline;
+        }
+
+        #usageCounter {
+            color: #1a73e8;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <h1>talk to AI</h1>
-    <p> here is a accses code with 5 free usages if you want more and get a unlimited usage one you can message me here at benchorev2@gmail.com </p>
-    <p>TEST5</p>
-    <div id="accessForm">
-        <input type="text" id="accessCode" placeholder="Enter access code">
-        <button onclick="verifyAccess()">Submit</button>
-    </div>
+    <div class="container">
+        <h1>Talk to AI - Premium Chat Experience</h1>
+        
+        <div class="info-section">
+            <p>Welcome! You can start with a free trial access code: <span class="code-display">TEST5</span></p>
+            <p>This code gives you 5 free uses to experience our advanced AI chat system.</p>
+        </div>
 
-    <div id="chatInterface">
-        <div id="chatbox"></div>
-        <div id="inputArea">
-            <input type="text" id="messageInput" placeholder="Type your message...">
-            <button onclick="sendMessage()">Send</button>
+        <div id="accessForm">
+            <input type="text" id="accessCode" placeholder="Enter your access code" autocomplete="off">
+            <button onclick="verifyAccess()">Start Chatting</button>
+        </div>
+
+        <div id="chatInterface">
+            <div id="chatbox"></div>
+            <div class="usage-info">
+                Remaining uses: <span id="usageCounter">5</span>
+            </div>
+            <div id="inputArea">
+                <input type="text" id="messageInput" placeholder="Type your message here...">
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <div class="premium-info">
+            <p>🌟 Want unlimited access and premium features?</p>
+            <p>Contact us at <a href="mailto:benchorev2@gmail.com" class="contact-info">benchorev2@gmail.com</a> for:</p>
+            <ul>
+                <li>Unlimited usage codes</li>
+                <li>Priority response times</li>
+                <li>Advanced AI features</li>
+                <li>Custom solutions</li>
+            </ul>
         </div>
     </div>
 
     <script>
         let currentAccessCode = '';
+        let usesRemaining = 5;
 
         async function verifyAccess() {
             const accessCode = document.getElementById('accessCode').value;
@@ -85,6 +206,12 @@
                     document.getElementById('accessForm').style.display = 'none';
                     document.getElementById('chatInterface').style.display = 'block';
                     currentAccessCode = accessCode;
+                    
+                    // Update usage counter if available
+                    if (data.usesLeft !== undefined) {
+                        usesRemaining = data.usesLeft;
+                        updateUsageCounter();
+                    }
                 } else {
                     alert('Invalid access code');
                 }
@@ -99,7 +226,6 @@
             
             if (!message) return;
 
-            // Add user message to chat
             addMessageToChat('You: ' + message, 'user-message');
             messageInput.value = '';
 
@@ -118,7 +244,13 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    addMessageToChat('ChatGPT: ' + data.response, 'bot-message');
+                    addMessageToChat('AI: ' + data.response, 'bot-message');
+                    
+                    // Update usage counter if available
+                    if (data.usesLeft !== undefined) {
+                        usesRemaining = data.usesLeft;
+                        updateUsageCounter();
+                    }
                 } else {
                     alert(data.error || 'Error sending message');
                 }
@@ -136,10 +268,21 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
-        // Allow sending message with Enter key
+        function updateUsageCounter() {
+            const counter = document.getElementById('usageCounter');
+            counter.textContent = usesRemaining === Infinity ? 'Unlimited' : usesRemaining;
+        }
+
+        // Enter key handlers
         document.getElementById('messageInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 sendMessage();
+            }
+        });
+
+        document.getElementById('accessCode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                verifyAccess();
             }
         });
     </script>

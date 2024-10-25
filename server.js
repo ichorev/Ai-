@@ -19,61 +19,15 @@ const openai = new OpenAI({
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// Advanced access code system with features
-const accessCodes = new Map([
-    ['UNLIMITED123', { 
-        uses: Infinity,
-        type: 'UNLIMITED',
-        description: 'Unlimited uses, no cooldown'
-    }],
-    ['PREMIUM50', { 
-        uses: 50,
-        type: 'PREMIUM',
-        cooldown: 3600000, // 1 hour in milliseconds
-        description: '50 uses, resets every hour'
-    }],
-    ['TURBO25', { 
-        uses: 25,
-        type: 'TURBO',
-        cooldown: 1800000, // 30 minutes
-        description: '25 uses, resets every 30 minutes'
-    }],
-    ['TRIAL10', { 
-        uses: 10,
-        type: 'TRIAL',
-        cooldown: 3600000, // 1 hour
-        description: '10 uses, resets every hour'
-    }],
-    ['VIP100', { 
-        uses: 100,
-        type: 'VIP',
-        cooldown: 7200000, // 2 hours
-        description: '100 uses, resets every 2 hours'
-    }]
-]);
+// Store valid access codes and their usage
+const accessCodes = new Map();
+const usageTracking = new Map();
 
-// Store usage history
-const usageHistory = new Map();
-
-// Function to check and reset cooldown
-function checkAndResetCooldown(accessCode, codeData) {
-    const now = Date.now();
-    const history = usageHistory.get(accessCode);
-
-    if (!history) return true;
-
-    // If code has cooldown and enough time has passed, reset uses
-    if (codeData.cooldown && (now - history.lastReset) >= codeData.cooldown) {
-        usageHistory.set(accessCode, {
-            uses: codeData.uses,
-            lastReset: now,
-            lastUsed: history.lastUsed
-        });
-        return true;
-    }
-
-    return false;
-}
+// Initialize some access codes
+accessCodes.set('UNLIMITED123', { uses: Infinity });
+accessCodes.set('TEST5', { uses: 5 });
+accessCodes.set('PREMIUM50', { uses: 50 });
+accessCodes.set('VIP100', { uses: 100 });
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -81,46 +35,22 @@ app.get('/', (req, res) => {
 
 app.post('/verify-access', (req, res) => {
     const { accessCode } = req.body;
-    const now = Date.now();
     
     if (accessCodes.has(accessCode)) {
-        const codeData = accessCodes.get(accessCode);
-        const history = usageHistory.get(accessCode);
-
-        // Check if this is first use
-        if (!history) {
-            usageHistory.set(accessCode, {
-                uses: codeData.uses - 1,
-                lastReset: now,
-                lastUsed: now
+        // Get or initialize usage tracking for this code
+        if (!usageTracking.has(accessCode)) {
+            const codeData = accessCodes.get(accessCode);
+            usageTracking.set(accessCode, {
+                remainingUses: codeData.uses
             });
-            res.json({ 
-                success: true,
-                type: codeData.type,
-                usesLeft: codeData.uses - 1,
-                description: codeData.description
-            });
-            return;
         }
-
-        // Check cooldown reset
-        checkAndResetCooldown(accessCode, codeData);
-        const updatedHistory = usageHistory.get(accessCode);
-
-        // Check if has uses left
-        if (updatedHistory.uses > 0 || codeData.uses === Infinity) {
-            // Update usage
-            usageHistory.set(accessCode, {
-                ...updatedHistory,
-                uses: codeData.uses === Infinity ? Infinity : updatedHistory.uses - 1,
-                lastUsed: now
-            });
-
+        
+        const tracking = usageTracking.get(accessCode);
+        
+        if (tracking.remainingUses > 0 || tracking.remainingUses === Infinity) {
             res.json({ 
                 success: true,
-                type: codeData.type,
-                usesLeft: updatedHistory.uses,
-                description: codeData.description
+                usesLeft: tracking.remainingUses
             });
             return;
         }
@@ -132,17 +62,15 @@ app.post('/verify-access', (req, res) => {
 app.post('/chat', async (req, res) => {
     const { message, accessCode } = req.body;
     
-    // Verify access code again
-    if (!accessCodes.has(accessCode)) {
+    // Verify access code and uses
+    if (!usageTracking.has(accessCode)) {
         res.json({ success: false, error: 'Invalid access code' });
         return;
     }
 
-    const codeData = accessCodes.get(accessCode);
-    const history = usageHistory.get(accessCode);
-
-    if (!history || (history.uses <= 0 && codeData.uses !== Infinity)) {
-        res.json({ success: false, error: 'Code expired or out of uses' });
+    const tracking = usageTracking.get(accessCode);
+    if (tracking.remainingUses <= 0 && tracking.remainingUses !== Infinity) {
+        res.json({ success: false, error: 'No uses remaining' });
         return;
     }
 
@@ -154,17 +82,18 @@ app.post('/chat', async (req, res) => {
             temperature: 0.7,
         });
 
-        // Update usage timestamp
-        usageHistory.set(accessCode, {
-            ...history,
-            lastUsed: Date.now()
-        });
+        // Decrease remaining uses if not unlimited
+        if (tracking.remainingUses !== Infinity) {
+            tracking.remainingUses -= 1;
+        }
+
+        // Update usage tracking
+        usageTracking.set(accessCode, tracking);
 
         res.json({
             success: true,
             response: completion.choices[0].message.content,
-            usesLeft: history.uses === Infinity ? 'Unlimited' : history.uses,
-            type: codeData.type
+            usesLeft: tracking.remainingUses
         });
     } catch (error) {
         console.error('OpenAI API Error:', error);
@@ -181,32 +110,6 @@ app.post('/chat', async (req, res) => {
             error: errorMessage
         });
     }
-});
-
-// Endpoint to check code status
-app.post('/check-status', (req, res) => {
-    const { accessCode } = req.body;
-    
-    if (accessCodes.has(accessCode)) {
-        const codeData = accessCodes.get(accessCode);
-        const history = usageHistory.get(accessCode);
-        
-        if (history) {
-            const timeLeft = codeData.cooldown ? 
-                Math.max(0, codeData.cooldown - (Date.now() - history.lastReset)) : 0;
-            
-            res.json({
-                success: true,
-                usesLeft: history.uses,
-                timeToReset: timeLeft,
-                type: codeData.type,
-                description: codeData.description
-            });
-            return;
-        }
-    }
-    
-    res.json({ success: false });
 });
 
 const PORT = process.env.PORT || 3000;

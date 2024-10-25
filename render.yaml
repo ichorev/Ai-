@@ -5,6 +5,6 @@ services:
     buildCommand: npm install
     startCommand: node server.js
     envVars:
-      - key: APIKEY
+      - key: Apikey
         sync: false
     nodeVersion: 18

@@ -23,13 +23,6 @@
             color: #1a73e8;
             text-align: center;
         }
-        .info-banner {
-            background-color: #e3f2fd;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #1a73e8;
-        }
         #chatbox {
             height: 400px;
             border: 1px solid #ddd;
@@ -92,10 +85,45 @@
             background-color: #ccc;
             cursor: not-allowed;
         }
-        .game-info {
-            text-align: center;
-            margin: 15px 0;
+        .account-switcher {
+            background-color: #f8f9fa;
             padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .account-menu {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .account-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid #e1e4e8;
+        }
+        .account-item:hover {
+            background-color: #e9ecef;
+        }
+        .account-item.active {
+            background-color: #e3f2fd;
+            border-left: 4px solid #1a73e8;
+        }
+        .new-account-button {
+            width: 100%;
+            margin-top: 10px;
+            background-color: #28a745;
+        }
+        .usage-info {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
             background-color: #e8f0fe;
             border-radius: 8px;
         }
@@ -109,12 +137,39 @@
         .code-item {
             display: flex;
             justify-content: space-between;
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
             align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e1e4e8;
         }
-        .code-item:last-child {
-            border-bottom: none;
+        .code-item .uses {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .code-item .expired {
+            color: #dc3545;
+        }
+        .game-info {
+            text-align: center;
+            margin: 15px 0;
+            padding: 15px;
+            background-color: #e8f0fe;
+            border-radius: 8px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e1e4e8;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #1a73e8;
+            transition: width 0.3s ease;
         }
         .reward-notification {
             position: fixed;
@@ -134,26 +189,15 @@
             0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
             100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
         }
-        .user-id {
-            font-family: monospace;
-            background-color: #f5f5f5;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.9em;
-            color: #666;
-        }
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background-color: #e1e4e8;
-            border-radius: 4px;
-            margin: 10px 0;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
+        .uses-counter {
+            position: absolute;
+            top: 10px;
+            right: 10px;
             background-color: #1a73e8;
-            transition: width 0.3s ease;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
         }
     </style>
 </head>
@@ -161,24 +205,32 @@
     <div class="container">
         <h1>AI Chat & Game Rewards</h1>
         
-        <div class="info-banner">
-            <p>Your Personal ID: <span id="displayUserId" class="user-id">Loading...</span></p>
-            <p>Earn unique access codes by playing the game!</p>
+        <div class="account-switcher">
+            <div class="current-account">
+                <p>Current Account: <span id="currentAccountId"></span></p>
+                <button onclick="toggleAccountMenu()">Switch Account</button>
+            </div>
+            <div id="accountMenu" class="account-menu">
+                <div id="accountsList"></div>
+                <button onclick="createNewAccount()" class="new-account-button">Create New Account</button>
+            </div>
         </div>
-        
+
         <div id="accessForm">
             <div class="input-area">
-                <input type="text" id="accessCode" placeholder="Enter your access code">
+                <input type="text" id="accessCode" placeholder="Enter access code">
                 <button onclick="verifyAccess()">Start Chat</button>
             </div>
-            
             <div id="personalCodes" class="codes-section" style="display: none;">
-                <h3>Your Earned Access Codes</h3>
+                <h3>Your Access Codes</h3>
                 <div id="codesList"></div>
             </div>
         </div>
 
         <div id="chatInterface" style="display: none;">
+            <div class="usage-info">
+                Remaining uses: <span id="usageCounter">-</span>
+            </div>
             <div id="chatbox"></div>
             <div class="input-area">
                 <input type="text" id="messageInput" placeholder="Type your message here...">
@@ -199,9 +251,7 @@
                 <p id="nextReward">Score 100 points for your first reward!</p>
             </div>
         </div>
-        
         <canvas id="gameCanvas" width="400" height="400"></canvas>
-        
         <div style="text-align: center; margin-top: 15px;">
             <button id="startButton" onclick="startGame()">Start Game</button>
         </div>
@@ -214,6 +264,7 @@
         let score = 0;
         let playerX = 200;
         let objects = [];
+        let currentUsesLeft = 0;
 
         async function initUser() {
             if (!userId) {
@@ -226,9 +277,89 @@
                     console.error('User initialization failed:', error);
                 }
             }
-            document.getElementById('displayUserId').textContent = userId;
+            document.getElementById('currentAccountId').textContent = formatUserId(userId);
             document.getElementById('personalCodes').style.display = 'block';
+            loadAccounts();
             updatePersonalCodes();
+        }
+
+        function formatUserId(id) {
+            return id.substring(0, 8) + '...';
+        }
+
+        async function loadAccounts() {
+            try {
+                const response = await fetch('/get-accounts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateAccountsList(data.accounts);
+                }
+            } catch (error) {
+                console.error('Error loading accounts:', error);
+            }
+        }
+
+        function updateAccountsList(accounts) {
+            const accountsList = document.getElementById('accountsList');
+            accountsList.innerHTML = '';
+            
+            accounts.forEach(account => {
+                const accountDiv = document.createElement('div');
+                accountDiv.className = `account-item ${account.id === userId ? 'active' : ''}`;
+                accountDiv.innerHTML = `
+                    <span class="account-id">${formatUserId(account.id)}</span>
+                    <span class="account-score">Score: ${account.session.score}</span>
+                `;
+                accountDiv.onclick = () => switchAccount(account.id);
+                accountsList.appendChild(accountDiv);
+            });
+        }
+
+        async function switchAccount(newUserId) {
+            try {
+                const response = await fetch('/switch-account', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, newUserId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    userId = newUserId;
+                    localStorage.setItem('userId', userId);
+                    document.getElementById('currentAccountId').textContent = formatUserId(userId);
+                    loadAccounts();
+                    updatePersonalCodes();
+                    resetChatInterface();
+                    toggleAccountMenu();
+                }
+            } catch (error) {
+                console.error('Error switching accounts:', error);
+            }
+        }
+
+        function resetChatInterface() {
+            document.getElementById('chatInterface').style.display = 'none';
+            document.getElementById('accessForm').style.display = 'block';
+            document.getElementById('chatbox').innerHTML = '';
+            currentAccessCode = '';
+        }
+
+        async function createNewAccount() {
+            try {
+                const response = await fetch('/init-user', { method: 'POST' });
+                const data = await response.json();
+                await switchAccount(data.userId);
+            } catch (error) {
+                console.error('Error creating new account:', error);
+            }
         }
 
         async function verifyAccess() {
@@ -247,6 +378,8 @@
                     document.getElementById('accessForm').style.display = 'none';
                     document.getElementById('chatInterface').style.display = 'block';
                     currentAccessCode = accessCode;
+                    currentUsesLeft = data.usesLeft;
+                    updateUsageCounter();
                     addMessage('System: Chat started! How can I help you?', 'bot-message');
                 } else {
                     alert('Invalid access code');
@@ -256,11 +389,25 @@
             }
         }
 
+        function updateUsageCounter() {
+            const counter = document.getElementById('usageCounter');
+            counter.textContent = currentUsesLeft === Infinity ? 'Unlimited' : currentUsesLeft;
+            if (currentUsesLeft <= 2 && currentUsesLeft !== Infinity) {
+                counter.style.color = '#dc3545';
+            } else {
+                counter.style.color = 'inherit';
+            }
+        }
+
         async function sendMessage() {
             const messageInput = document.getElementById('messageInput');
             const message = messageInput.value.trim();
             
             if (!message) return;
+            if (currentUsesLeft <= 0 && currentUsesLeft !== Infinity) {
+                alert('No uses remaining. Please use a different access code.');
+                return;
+            }
 
             addMessage('You: ' + message, 'user-message');
             messageInput.value = '';
@@ -280,6 +427,12 @@
                 
                 if (data.success) {
                     addMessage('AI: ' + data.response, 'bot-message');
+                    currentUsesLeft = data.usesLeft;
+                    updateUsageCounter();
+                    
+                    if (currentUsesLeft <= 0) {
+                        addMessage('System: You have run out of uses for this code.', 'bot-message');
+                    }
                 } else {
                     alert(data.error || 'Error sending message');
                 }
@@ -391,13 +544,17 @@
             }
         }
 
+        function updateScore() {
+            document.getElementById('score').textContent = score;
+        }
+
         function updateProgress(currentScore, nextReward) {
             const progressFill = document.getElementById('progressFill');
             const nextRewardText = document.getElementById('nextReward');
             
             if (nextReward) {
                 const percentage = (currentScore / nextReward.total) * 100;
-                progressFill.style.width = `${percentage}%`;
+                progressFill.style.width = `${Math.min(100, percentage)}%`;
                 nextRewardText.textContent = 
                     `Score ${nextReward.pointsNeeded} more points for ${nextReward.tier} reward!`;
             } else {
@@ -422,7 +579,7 @@
 
         async function updatePersonalCodes() {
             const codesList = document.getElementById('codesList');
-            codesList.innerHTML = '';
+            if (!codesList) return;
             
             try {
                 const response = await fetch('/game-score', {
@@ -434,12 +591,18 @@
                 const data = await response.json();
                 
                 if (data.earnedCodes) {
+                    codesList.innerHTML = '';
                     data.earnedCodes.forEach(code => {
                         const codeDiv = document.createElement('div');
                         codeDiv.className = 'code-item';
                         codeDiv.innerHTML = `
-                            <span>${code.tier}: ${code.code}</span>
-                            <span>${code.uses} uses</span>
+                            <div>
+                                <div>${code.tier}</div>
+                                <div style="font-family: monospace;">${code.code}</div>
+                            </div>
+                            <div class="uses ${code.uses <= 0 ? 'expired' : ''}">
+                                ${code.uses === Infinity ? 'Unlimited' : `${code.uses} uses`}
+                            </div>
                         `;
                         codesList.appendChild(codeDiv);
                     });
@@ -449,10 +612,12 @@
             }
         }
 
-        function updateScore() {
-            document.getElementById('score').textContent = score;
-            }
+        function toggleAccountMenu() {
+            const menu = document.getElementById('accountMenu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        }
 
+        // Event Listeners
         document.getElementById('gameCanvas').addEventListener('mousemove', (e) => {
             if (!gameActive) return;
             
@@ -461,7 +626,7 @@
             playerX = Math.max(25, Math.min(375, e.clientX - rect.left));
         });
 
-        // Touch support for mobile devices
+        // Touch support for mobile
         document.getElementById('gameCanvas').addEventListener('touchmove', (e) => {
             if (!gameActive) return;
             e.preventDefault();
@@ -472,6 +637,7 @@
             playerX = Math.max(25, Math.min(375, touch.clientX - rect.left));
         }, { passive: false });
 
+        // Enter key handlers
         document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -486,135 +652,17 @@
             }
         });
 
-        // Initialize tooltips
-        const tooltipElements = document.querySelectorAll('[data-tooltip]');
-        tooltipElements.forEach(element => {
-            element.addEventListener('mouseover', (e) => {
-                const tooltip = document.createElement('div');
-                tooltip.className = 'tooltip';
-                tooltip.textContent = element.dataset.tooltip;
-                document.body.appendChild(tooltip);
-                
-                const rect = element.getBoundingClientRect();
-                tooltip.style.top = rect.bottom + 5 + 'px';
-                tooltip.style.left = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2) + 'px';
-            });
-
-            element.addEventListener('mouseout', () => {
-                const tooltip = document.querySelector('.tooltip');
-                if (tooltip) tooltip.remove();
-            });
-        });
-
-        // Add these styles for tooltips
-        const styleSheet = document.createElement('style');
-        styleSheet.textContent = `
-            .tooltip {
-                position: absolute;
-                background-color: rgba(0, 0, 0, 0.8);
-                color: white;
-                padding: 5px 10px;
-                border-radius: 4px;
-                font-size: 14px;
-                z-index: 1000;
-                pointer-events: none;
-            }
-
-            .blink {
-                animation: blink 1s infinite;
-            }
-
-            @keyframes blink {
-                50% { opacity: 0.5; }
-            }
-
-            .shake {
-                animation: shake 0.5s;
-            }
-
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                25% { transform: translateX(-5px); }
-                75% { transform: translateX(5px); }
-            }
-        `;
-        document.head.appendChild(styleSheet);
-
-        // Add visual feedback for score increases
-        function showScoreIncrease(amount) {
-            const scorePopup = document.createElement('div');
-            scorePopup.className = 'score-popup';
-            scorePopup.textContent = `+${amount}`;
-            document.getElementById('score').appendChild(scorePopup);
-            
-            setTimeout(() => scorePopup.remove(), 1000);
-        }
-
-        // Sound effects (optional - uncomment if you want sound)
-        /*
-        const sounds = {
-            collect: new Audio('collect.mp3'),
-            gameOver: new Audio('gameover.mp3'),
-            reward: new Audio('reward.mp3')
-        };
-        
-        function playSound(soundName) {
-            const sound = sounds[soundName];
-            if (sound) {
-                sound.currentTime = 0;
-                sound.play().catch(err => console.log('Sound play error:', err));
-            }
-        }
-        */
-
-        // Performance optimization
-        let lastFrame = 0;
-        const FPS = 60;
-        const frameDelay = 1000 / FPS;
-
-        function optimizedGameLoop(timestamp) {
-            if (!gameActive) return;
-            
-            if (timestamp - lastFrame >= frameDelay) {
-                lastFrame = timestamp;
-                gameLoop();
-            }
-            
-            requestAnimationFrame(optimizedGameLoop);
-        }
-
-        // Error handling and reconnection
-        async function handleServerError(retryFunction) {
-            let retries = 3;
-            while (retries > 0) {
-                try {
-                    await retryFunction();
-                    break;
-                } catch (error) {
-                    retries--;
-                    if (retries === 0) {
-                        alert('Connection error. Please refresh the page.');
-                    } else {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                }
-            }
-        }
-
-        // Initialize everything when the page loads
-        window.addEventListener('load', () => {
-            initUser().catch(error => {
-                console.error('Initialization error:', error);
-                alert('Failed to initialize. Please refresh the page.');
-            });
-        });
-
-        // Clean up on page unload
-        window.addEventListener('beforeunload', () => {
-            if (gameActive) {
-                endGame();
+        // Close account menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('accountMenu');
+            const switcher = document.querySelector('.account-switcher');
+            if (!switcher.contains(e.target)) {
+                menu.style.display = 'none';
             }
         });
+
+        // Initialize everything
+        window.addEventListener('load', initUser);
     </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Talk to AI - Advanced Chat Interface</title>
+    <title>AI Chat with Game Rewards</title>
     <style>
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
@@ -12,213 +12,233 @@
             padding: 20px;
             background-color: #f0f2f5;
         }
-
         .container {
             background-color: white;
             border-radius: 15px;
             padding: 25px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            color: #1a73e8;
-            text-align: center;
             margin-bottom: 20px;
         }
-
-        .info-section {
-            background-color: #e8f0fe;
-            border-radius: 10px;
+        h1, h2 {
+            color: #1a73e8;
+            text-align: center;
+        }
+        .info-banner {
+            background-color: #e3f2fd;
             padding: 15px;
+            border-radius: 8px;
             margin-bottom: 20px;
             border-left: 4px solid #1a73e8;
         }
-
-        .code-display {
-            background-color: #f8f9fa;
-            padding: 10px 15px;
-            border-radius: 5px;
-            font-family: monospace;
-            color: #1a73e8;
-            font-size: 1.2em;
-            display: inline-block;
-            margin: 10px 0;
-        }
-
         #chatbox {
-            height: 500px;
-            border: 1px solid #e1e4e8;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            padding: 15px;
+            height: 400px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
             overflow-y: auto;
+            border-radius: 8px;
             background-color: #fff;
         }
-
-        #inputArea {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        input {
-            padding: 12px;
-            border: 1px solid #e1e4e8;
-            border-radius: 8px;
-            font-size: 16px;
-        }
-
-        #messageInput {
-            flex-grow: 1;
-        }
-
-        button {
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #1557b0;
-        }
-
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-
         .message {
-            margin: 10px 0;
-            padding: 12px;
-            border-radius: 10px;
+            margin: 5px;
+            padding: 10px;
+            border-radius: 8px;
             max-width: 80%;
             word-wrap: break-word;
         }
-
         .user-message {
             background-color: #e3f2fd;
             margin-left: auto;
             color: #1557b0;
         }
-
         .bot-message {
             background-color: #f5f5f5;
             margin-right: auto;
             color: #333;
         }
-
-        #accessForm {
+        #gameCanvas {
+            border: 2px solid #1a73e8;
+            border-radius: 8px;
+            margin: 10px auto;
+            display: block;
+            background-color: #fff;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        input {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #1557b0;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .game-info {
             text-align: center;
-            margin: 20px 0;
-        }
-
-        #chatInterface {
-            display: none;
-        }
-
-        .usage-info {
-            text-align: center;
-            color: #666;
-            font-size: 0.9em;
-            margin: 10px 0;
-            padding: 5px;
-            background-color: #e8f0fe;
-            border-radius: 5px;
-        }
-
-        .premium-info {
-            background-color: #fff3e0;
-            border-radius: 10px;
+            margin: 15px 0;
             padding: 15px;
+            background-color: #e8f0fe;
+            border-radius: 8px;
+        }
+        .codes-section {
             margin-top: 20px;
-            border-left: 4px solid #ff9800;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e1e4e8;
         }
-
-        .contact-info {
-            color: #1a73e8;
-            text-decoration: none;
-            font-weight: bold;
+        .code-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            align-items: center;
         }
-
-        .contact-info:hover {
-            text-decoration: underline;
+        .code-item:last-child {
+            border-bottom: none;
         }
-
-        #usageCounter {
-            background-color: #e3f2fd;
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-weight: bold;
-            color: #1a73e8;
+        .reward-notification {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #4caf50;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+            z-index: 1000;
+            text-align: center;
+            animation: popIn 0.3s ease-out;
         }
-
-        .usage-warning {
-            color: #d32f2f;
-            font-weight: bold;
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        .user-id {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e1e4e8;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #1a73e8;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Talk to AI - Premium Chat Experience</h1>
+        <h1>AI Chat & Game Rewards</h1>
         
-        <div class="info-section">
-            <p>Welcome! You can start with a free trial access code: <span class="code-display">TEST5</span></p>
-            <p>This code gives you 5 free uses to experience our advanced AI chat system.</p>
+        <div class="info-banner">
+            <p>Your Personal ID: <span id="displayUserId" class="user-id">Loading...</span></p>
+            <p>Earn unique access codes by playing the game!</p>
         </div>
-
+        
         <div id="accessForm">
-            <input type="text" id="accessCode" placeholder="Enter your access code" autocomplete="off">
-            <button onclick="verifyAccess()">Start Chatting</button>
+            <div class="input-area">
+                <input type="text" id="accessCode" placeholder="Enter your access code">
+                <button onclick="verifyAccess()">Start Chat</button>
+            </div>
+            
+            <div id="personalCodes" class="codes-section" style="display: none;">
+                <h3>Your Earned Access Codes</h3>
+                <div id="codesList"></div>
+            </div>
         </div>
 
-        <div id="chatInterface">
-            <div class="usage-info">
-                Remaining uses: <span id="usageCounter">-</span>
-            </div>
+        <div id="chatInterface" style="display: none;">
             <div id="chatbox"></div>
-            <div id="inputArea">
+            <div class="input-area">
                 <input type="text" id="messageInput" placeholder="Type your message here...">
-                <button onclick="sendMessage()" id="sendButton">Send</button>
+                <button onclick="sendMessage()">Send</button>
             </div>
         </div>
+    </div>
 
-        <div class="premium-info">
-            <p>🌟 Want unlimited access and premium features?</p>
-            <p>Contact us at <a href="mailto:benchorev2@gmail.com" class="contact-info">benchorev2@gmail.com</a> for:</p>
-            <ul>
-                <li>Unlimited usage codes</li>
-                <li>Priority response times</li>
-                <li>Advanced AI features</li>
-                <li>Custom solutions</li>
-            </ul>
+    <div class="container">
+        <h2>Play to Earn Rewards! 🎮</h2>
+        <div class="game-info">
+            <p>Current Score: <span id="score">0</span></p>
+            <div id="progressContainer">
+                <p>Progress to Next Reward:</p>
+                <div class="progress-bar">
+                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <p id="nextReward">Score 100 points for your first reward!</p>
+            </div>
+        </div>
+        
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        
+        <div style="text-align: center; margin-top: 15px;">
+            <button id="startButton" onclick="startGame()">Start Game</button>
         </div>
     </div>
 
     <script>
+        let userId = localStorage.getItem('userId');
         let currentAccessCode = '';
-        let usesRemaining = 0;
+        let gameActive = false;
+        let score = 0;
+        let playerX = 200;
+        let objects = [];
+
+        async function initUser() {
+            if (!userId) {
+                try {
+                    const response = await fetch('/init-user', { method: 'POST' });
+                    const data = await response.json();
+                    userId = data.userId;
+                    localStorage.setItem('userId', userId);
+                } catch (error) {
+                    console.error('User initialization failed:', error);
+                }
+            }
+            document.getElementById('displayUserId').textContent = userId;
+            document.getElementById('personalCodes').style.display = 'block';
+            updatePersonalCodes();
+        }
 
         async function verifyAccess() {
             const accessCode = document.getElementById('accessCode').value.trim();
             
-            if (!accessCode) {
-                alert('Please enter an access code');
-                return;
-            }
-            
             try {
                 const response = await fetch('/verify-access', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ accessCode })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accessCode, userId })
                 });
                 
                 const data = await response.json();
@@ -227,15 +247,12 @@
                     document.getElementById('accessForm').style.display = 'none';
                     document.getElementById('chatInterface').style.display = 'block';
                     currentAccessCode = accessCode;
-                    usesRemaining = data.usesLeft;
-                    updateUsageDisplay();
-                    addMessageToChat('AI: Welcome! How can I help you today?', 'bot-message');
+                    addMessage('System: Chat started! How can I help you?', 'bot-message');
                 } else {
                     alert('Invalid access code');
                 }
             } catch (error) {
                 alert('Error verifying access code');
-                console.error('Verification error:', error);
             }
         }
 
@@ -244,88 +261,358 @@
             const message = messageInput.value.trim();
             
             if (!message) return;
-            if (usesRemaining <= 0 && usesRemaining !== Infinity) {
-                alert('No uses remaining. Please contact us for more access.');
-                return;
-            }
 
-            const sendButton = document.getElementById('sendButton');
-            sendButton.disabled = true;
-
-            addMessageToChat('You: ' + message, 'user-message');
+            addMessage('You: ' + message, 'user-message');
             messageInput.value = '';
 
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message,
-                        accessCode: currentAccessCode
+                        accessCode: currentAccessCode,
+                        userId
                     })
                 });
 
                 const data = await response.json();
                 
                 if (data.success) {
-                    addMessageToChat('AI: ' + data.response, 'bot-message');
-                    usesRemaining = data.usesLeft;
-                    updateUsageDisplay();
+                    addMessage('AI: ' + data.response, 'bot-message');
                 } else {
                     alert(data.error || 'Error sending message');
                 }
             } catch (error) {
                 alert('Error communicating with server');
-                console.error('Send message error:', error);
-            } finally {
-                sendButton.disabled = false;
             }
         }
 
-        function updateUsageDisplay() {
-            const counter = document.getElementById('usageCounter');
-            const usageText = usesRemaining === Infinity ? 'Unlimited' : usesRemaining;
-            counter.textContent = usageText;
-
-            if (usesRemaining !== Infinity && usesRemaining <= 2) {
-                counter.classList.add('usage-warning');
-            } else {
-                counter.classList.remove('usage-warning');
-            }
-
-            const messageInput = document.getElementById('messageInput');
-            const sendButton = document.getElementById('sendButton');
-            const disabled = usesRemaining !== Infinity && usesRemaining <= 0;
-            messageInput.disabled = disabled;
-            sendButton.disabled = disabled;
-
-            if (disabled) {
-                addMessageToChat('AI: You have run out of uses. Please contact us for more access.', 'bot-message usage-warning');
-            }
-        }
-
-        function addMessageToChat(message, className) {
+        function addMessage(message, className) {
             const chatbox = document.getElementById('chatbox');
             const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${className}`;
+            messageDiv.className = 'message ' + className;
             messageDiv.textContent = message;
             chatbox.appendChild(messageDiv);
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
+        function startGame() {
+            if (gameActive) return;
+            gameActive = true;
+            score = 0;
+            objects = [];
+            updateScore();
+            document.getElementById('startButton').disabled = true;
+            gameLoop();
+            spawnObjects();
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+            
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw player
+            ctx.fillStyle = '#1a73e8';
+            ctx.fillRect(playerX - 25, 350, 50, 10);
+            
+            // Update and draw objects
+            for (let i = objects.length - 1; i >= 0; i--) {
+                const obj = objects[i];
+                obj.y += 3;
+                
+                ctx.beginPath();
+                ctx.arc(obj.x, obj.y, 10, 0, Math.PI * 2);
+                ctx.fillStyle = obj.type === 'good' ? '#4caf50' : '#f44336';
+                ctx.fill();
+                
+                if (obj.y > 350 && obj.y < 370) {
+                    if (Math.abs(obj.x - playerX) < 35) {
+                        if (obj.type === 'good') {
+                            score += 10;
+                            updateScore();
+                        } else {
+                            endGame();
+                        }
+                        objects.splice(i, 1);
+                    }
+                }
+                
+                if (obj.y > 400) {
+                    objects.splice(i, 1);
+                }
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        function spawnObjects() {
+            if (!gameActive) return;
+            
+            const obj = {
+                x: Math.random() * 360 + 20,
+                y: 0,
+                type: Math.random() > 0.3 ? 'good' : 'bad'
+            };
+            
+            objects.push(obj);
+            setTimeout(spawnObjects, 1000);
+        }
+
+        async function endGame() {
+            gameActive = false;
+            document.getElementById('startButton').disabled = false;
+            
+            try {
+                const response = await fetch('/game-score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, score })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    if (data.newReward) {
+                        showRewardNotification(data.newReward);
+                        updatePersonalCodes();
+                    }
+                    
+                    if (data.nextReward) {
+                        updateProgress(data.totalScore, data.nextReward);
+                    }
+                }
+            } catch (error) {
+                console.error('Error submitting score:', error);
+            }
+        }
+
+        function updateProgress(currentScore, nextReward) {
+            const progressFill = document.getElementById('progressFill');
+            const nextRewardText = document.getElementById('nextReward');
+            
+            if (nextReward) {
+                const percentage = (currentScore / nextReward.total) * 100;
+                progressFill.style.width = `${percentage}%`;
+                nextRewardText.textContent = 
+                    `Score ${nextReward.pointsNeeded} more points for ${nextReward.tier} reward!`;
+            } else {
+                progressFill.style.width = '100%';
+                nextRewardText.textContent = 'All rewards earned!';
+            }
+        }
+
+        function showRewardNotification(reward) {
+            const notification = document.createElement('div');
+            notification.className = 'reward-notification';
+            notification.innerHTML = `
+                <h3>🎉 New Reward Earned! 🎉</h3>
+                <p>You've earned a ${reward.tier} access code:</p>
+                <p style="font-family: monospace; font-size: 1.2em;">${reward.code}</p>
+                <p>(${reward.uses} uses)</p>
+            `;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 5000);
+        }
+
+        async function updatePersonalCodes() {
+            const codesList = document.getElementById('codesList');
+            codesList.innerHTML = '';
+            
+            try {
+                const response = await fetch('/game-score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, score: 0 })
+                });
+                
+                const data = await response.json();
+                
+                if (data.earnedCodes) {
+                    data.earnedCodes.forEach(code => {
+                        const codeDiv = document.createElement('div');
+                        codeDiv.className = 'code-item';
+                        codeDiv.innerHTML = `
+                            <span>${code.tier}: ${code.code}</span>
+                            <span>${code.uses} uses</span>
+                        `;
+                        codesList.appendChild(codeDiv);
+                    });
+                }
+            } catch (error) {
+                console.error('Error updating personal codes:', error);
+            }
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = score;
+            }
+
+        document.getElementById('gameCanvas').addEventListener('mousemove', (e) => {
+            if (!gameActive) return;
+            
+            const canvas = document.getElementById('gameCanvas');
+            const rect = canvas.getBoundingClientRect();
+            playerX = Math.max(25, Math.min(375, e.clientX - rect.left));
+        });
+
+        // Touch support for mobile devices
+        document.getElementById('gameCanvas').addEventListener('touchmove', (e) => {
+            if (!gameActive) return;
+            e.preventDefault();
+            
+            const canvas = document.getElementById('gameCanvas');
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            playerX = Math.max(25, Math.min(375, touch.clientX - rect.left));
+        }, { passive: false });
+
+        document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
             }
         });
 
-        document.getElementById('accessCode').addEventListener('keypress', (e) => {
+        document.getElementById('accessCode')?.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 verifyAccess();
+            }
+        });
+
+        // Initialize tooltips
+        const tooltipElements = document.querySelectorAll('[data-tooltip]');
+        tooltipElements.forEach(element => {
+            element.addEventListener('mouseover', (e) => {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                tooltip.textContent = element.dataset.tooltip;
+                document.body.appendChild(tooltip);
+                
+                const rect = element.getBoundingClientRect();
+                tooltip.style.top = rect.bottom + 5 + 'px';
+                tooltip.style.left = rect.left + (rect.width / 2) - (tooltip.offsetWidth / 2) + 'px';
+            });
+
+            element.addEventListener('mouseout', () => {
+                const tooltip = document.querySelector('.tooltip');
+                if (tooltip) tooltip.remove();
+            });
+        });
+
+        // Add these styles for tooltips
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            .tooltip {
+                position: absolute;
+                background-color: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 14px;
+                z-index: 1000;
+                pointer-events: none;
+            }
+
+            .blink {
+                animation: blink 1s infinite;
+            }
+
+            @keyframes blink {
+                50% { opacity: 0.5; }
+            }
+
+            .shake {
+                animation: shake 0.5s;
+            }
+
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-5px); }
+                75% { transform: translateX(5px); }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+        // Add visual feedback for score increases
+        function showScoreIncrease(amount) {
+            const scorePopup = document.createElement('div');
+            scorePopup.className = 'score-popup';
+            scorePopup.textContent = `+${amount}`;
+            document.getElementById('score').appendChild(scorePopup);
+            
+            setTimeout(() => scorePopup.remove(), 1000);
+        }
+
+        // Sound effects (optional - uncomment if you want sound)
+        /*
+        const sounds = {
+            collect: new Audio('collect.mp3'),
+            gameOver: new Audio('gameover.mp3'),
+            reward: new Audio('reward.mp3')
+        };
+        
+        function playSound(soundName) {
+            const sound = sounds[soundName];
+            if (sound) {
+                sound.currentTime = 0;
+                sound.play().catch(err => console.log('Sound play error:', err));
+            }
+        }
+        */
+
+        // Performance optimization
+        let lastFrame = 0;
+        const FPS = 60;
+        const frameDelay = 1000 / FPS;
+
+        function optimizedGameLoop(timestamp) {
+            if (!gameActive) return;
+            
+            if (timestamp - lastFrame >= frameDelay) {
+                lastFrame = timestamp;
+                gameLoop();
+            }
+            
+            requestAnimationFrame(optimizedGameLoop);
+        }
+
+        // Error handling and reconnection
+        async function handleServerError(retryFunction) {
+            let retries = 3;
+            while (retries > 0) {
+                try {
+                    await retryFunction();
+                    break;
+                } catch (error) {
+                    retries--;
+                    if (retries === 0) {
+                        alert('Connection error. Please refresh the page.');
+                    } else {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+            }
+        }
+
+        // Initialize everything when the page loads
+        window.addEventListener('load', () => {
+            initUser().catch(error => {
+                console.error('Initialization error:', error);
+                alert('Failed to initialize. Please refresh the page.');
+            });
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (gameActive) {
+                endGame();
             }
         });
     </script>

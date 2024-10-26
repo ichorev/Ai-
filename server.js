@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const app = express();
 
 // Import OpenAI
@@ -19,59 +20,179 @@ const openai = new OpenAI({
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
-// Store valid access codes and their usage
-const accessCodes = new Map();
-const usageTracking = new Map();
+// Data Storage
+const users = new Map();          // Store user data
+const accessCodes = new Map();    // Public codes
+const personalCodes = new Map();  // User-specific codes
+const usageTracking = new Map();  // Track code usage
 
-// Initialize some access codes
-accessCodes.set('UNLIMITED123', { uses: Infinity });
-accessCodes.set('TEST5', { uses: 5 });
-accessCodes.set('PREMIUM50', { uses: 50 });
-accessCodes.set('VIP100', { uses: 100 });
+// Initialize standard access code
+accessCodes.set('TEST5', { uses: 5, tier: 'BASIC' });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+// Game reward thresholds
+const REWARD_TIERS = {
+    BRONZE: { points: 100, uses: 10 },
+    SILVER: { points: 250, uses: 25 },
+    GOLD: { points: 500, uses: 50 },
+    PLATINUM: { points: 1000, uses: 100 }
+};
+
+// Generate unique user ID
+function generateUserId() {
+    return crypto.randomBytes(8).toString('hex');
+}
+
+// Generate secure personal code
+function generatePersonalCode(userId, tier) {
+    const timestamp = Date.now();
+    const random = crypto.randomBytes(4).toString('hex');
+    const hash = crypto.createHash('sha256')
+        .update(`${userId}-${tier}-${timestamp}-${random}`)
+        .digest('hex')
+        .substring(0, 8);
+    return `${tier}_${hash}_${random}`;
+}
+
+// User session initialization
+app.post('/init-user', (req, res) => {
+    const userId = generateUserId();
+    users.set(userId, {
+        created: Date.now(),
+        score: 0,
+        earnedCodes: [],
+        lastPlayed: null
+    });
+    res.json({ userId });
+});
+
+// Handle game score and reward generation
+app.post('/game-score', (req, res) => {
+    const { userId, score } = req.body;
+    
+    if (!users.has(userId)) {
+        return res.json({ success: false, error: 'Invalid user' });
+    }
+
+    const userData = users.get(userId);
+    userData.score += score;
+    userData.lastPlayed = Date.now();
+
+    // Check for rewards
+    let newReward = null;
+    for (const [tier, data] of Object.entries(REWARD_TIERS)) {
+        if (userData.score >= data.points && 
+            !userData.earnedCodes.some(code => code.tier === tier)) {
+            
+            const newCode = generatePersonalCode(userId, tier);
+            const rewardData = {
+                code: newCode,
+                tier: tier,
+                uses: data.uses,
+                earned: Date.now()
+            };
+            
+            personalCodes.set(newCode, {
+                userId,
+                ...rewardData
+            });
+            
+            userData.earnedCodes.push(rewardData);
+            newReward = rewardData;
+            break;
+        }
+    }
+
+    // Update user data
+    users.set(userId, userData);
+
+    // Calculate next reward
+    let nextReward = null;
+    for (const [tier, data] of Object.entries(REWARD_TIERS)) {
+        if (userData.score < data.points) {
+            nextReward = {
+                tier,
+                pointsNeeded: data.points - userData.score,
+                total: data.points
+            };
+            break;
+        }
+    }
+
+    res.json({
+        success: true,
+        totalScore: userData.score,
+        newReward,
+        nextReward,
+        earnedCodes: userData.earnedCodes
+    });
 });
 
 app.post('/verify-access', (req, res) => {
-    const { accessCode } = req.body;
-    
+    const { accessCode, userId } = req.body;
+
+    // Check personal codes first
+    if (personalCodes.has(accessCode)) {
+        const codeData = personalCodes.get(accessCode);
+        if (codeData.userId === userId) {
+            if (!usageTracking.has(accessCode)) {
+                usageTracking.set(accessCode, {
+                    remainingUses: codeData.uses,
+                    tier: codeData.tier
+                });
+            }
+            const tracking = usageTracking.get(accessCode);
+            if (tracking.remainingUses > 0) {
+                res.json({
+                    success: true,
+                    usesLeft: tracking.remainingUses,
+                    tier: codeData.tier,
+                    personal: true
+                });
+                return;
+            }
+        }
+    }
+
+    // Check public codes
     if (accessCodes.has(accessCode)) {
-        // Get or initialize usage tracking for this code
         if (!usageTracking.has(accessCode)) {
             const codeData = accessCodes.get(accessCode);
             usageTracking.set(accessCode, {
-                remainingUses: codeData.uses
+                remainingUses: codeData.uses,
+                tier: codeData.tier
             });
         }
         
         const tracking = usageTracking.get(accessCode);
-        
-        if (tracking.remainingUses > 0 || tracking.remainingUses === Infinity) {
-            res.json({ 
+        if (tracking.remainingUses > 0) {
+            res.json({
                 success: true,
-                usesLeft: tracking.remainingUses
+                usesLeft: tracking.remainingUses,
+                tier: tracking.tier,
+                personal: false
             });
             return;
         }
     }
-    
+
     res.json({ success: false });
 });
 
 app.post('/chat', async (req, res) => {
-    const { message, accessCode } = req.body;
-    
-    // Verify access code and uses
-    if (!usageTracking.has(accessCode)) {
-        res.json({ success: false, error: 'Invalid access code' });
-        return;
+    const { message, accessCode, userId } = req.body;
+
+    // Verify access code and usage
+    const tracking = usageTracking.get(accessCode);
+    if (!tracking || tracking.remainingUses <= 0) {
+        return res.json({ success: false, error: 'Invalid or expired code' });
     }
 
-    const tracking = usageTracking.get(accessCode);
-    if (tracking.remainingUses <= 0 && tracking.remainingUses !== Infinity) {
-        res.json({ success: false, error: 'No uses remaining' });
-        return;
+    // Verify personal code ownership
+    if (personalCodes.has(accessCode)) {
+        const codeData = personalCodes.get(accessCode);
+        if (codeData.userId !== userId) {
+            return res.json({ success: false, error: 'Invalid personal code' });
+        }
     }
 
     try {
@@ -82,32 +203,21 @@ app.post('/chat', async (req, res) => {
             temperature: 0.7,
         });
 
-        // Decrease remaining uses if not unlimited
-        if (tracking.remainingUses !== Infinity) {
-            tracking.remainingUses -= 1;
-        }
-
-        // Update usage tracking
+        // Update usage
+        tracking.remainingUses--;
         usageTracking.set(accessCode, tracking);
 
         res.json({
             success: true,
             response: completion.choices[0].message.content,
-            usesLeft: tracking.remainingUses
+            usesLeft: tracking.remainingUses,
+            tier: tracking.tier
         });
     } catch (error) {
         console.error('OpenAI API Error:', error);
-        let errorMessage = 'Error communicating with ChatGPT';
-        
-        if (error.message.includes('insufficient_quota')) {
-            errorMessage = 'API quota exceeded. Please try again later.';
-        } else if (error.message.includes('model not found')) {
-            errorMessage = 'Model access not available. Please check your API key permissions.';
-        }
-        
         res.json({
             success: false,
-            error: errorMessage
+            error: 'Error communicating with ChatGPT'
         });
     }
 });
@@ -116,5 +226,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log('API Key:', process.env.Apikey ? 'Present' : 'Missing');
-    console.log('Using GPT-4-0125-preview model');
 });

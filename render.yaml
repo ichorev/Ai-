@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: chatgpt-interface
+    name: ai-chat-game
     env: node
     buildCommand: npm install
     startCommand: node server.js

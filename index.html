@@ -3,577 +3,552 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>talk with ai</title>
-   <style>
-    body {
-        font-family: 'Segoe UI', Arial, sans-serif;
-        max-width: 900px;
-        margin: 0 auto;
-        padding: 20px;
-        background-color: #f0f2f5;
-    }
+    <title>AI Chat System</title>
+    <style>
+        /* Reset and Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    .container {
-        background-color: white;
-        border-radius: 15px;
-        padding: 25px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-        position: relative;
-    }
-
-    h1, h2 {
-        color: #1a73e8;
-        text-align: center;
-        margin-bottom: 20px;
-    }
-
-    .info-banner {
-        background-color: #e3f2fd;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        text-align: center;
-        border-left: 4px solid #1a73e8;
-    }
-
-    .free-code {
-        font-family: monospace;
-        font-size: 24px;
-        color: #1a73e8;
-        background-color: #f8f9fa;
-        padding: 10px 20px;
-        border-radius: 5px;
-        display: inline-block;
-        margin: 10px 0;
-        border: 2px dashed #1a73e8;
-    }
-
-    .contact-link {
-        color: #1a73e8;
-        text-decoration: none;
-        font-weight: bold;
-    }
-
-    .contact-link:hover {
-        text-decoration: underline;
-    }
-
-    #chatbox {
-        height: 400px;
-        border: 1px solid #ddd;
-        padding: 15px;
-        margin: 10px 0;
-        overflow-y: auto;
-        border-radius: 8px;
-        background-color: #fff;
-    }
-
-    .message {
-        margin: 8px 0;
-        padding: 12px;
-        border-radius: 10px;
-        max-width: 80%;
-        word-wrap: break-word;
-        line-height: 1.4;
-    }
-
-    .user-message {
-        background-color: #e3f2fd;
-        margin-left: auto;
-        color: #1557b0;
-    }
-
-    .bot-message {
-        background-color: #f5f5f5;
-        margin-right: auto;
-        color: #333;
-    }
-
-    #gameCanvas {
-        border: 2px solid #1a73e8;
-        border-radius: 8px;
-        margin: 10px auto;
-        display: block;
-        background-color: #fff;
-    }
-
-    .input-area {
-        display: flex;
-        gap: 10px;
-        margin-top: 10px;
-    }
-
-    input {
-        flex-grow: 1;
-        padding: 12px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        font-size: 16px;
-        transition: border-color 0.3s;
-    }
-
-    input:focus {
-        outline: none;
-        border-color: #1a73e8;
-        box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
-    }
-
-    button {
-        padding: 12px 24px;
-        background-color: #1a73e8;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 16px;
-        transition: all 0.2s;
-    }
-
-    button:hover {
-        background-color: #1557b0;
-        transform: translateY(-1px);
-    }
-
-    button:disabled {
-        background-color: #ccc;
-        cursor: not-allowed;
-        transform: none;
-    }
-
-    .account-switcher {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        border: 1px solid #e1e4e8;
-    }
-
-    .current-account {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 10px;
-    }
-
-    .account-menu {
-        display: none;
-        margin-top: 10px;
-        padding: 10px;
-        background-color: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-    }
-
-    .account-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 12px;
-        margin: 5px 0;
-        border-radius: 6px;
-        cursor: pointer;
-        border: 1px solid #e1e4e8;
-        transition: all 0.2s;
-    }
-
-    .account-item:hover {
-        background-color: #e9ecef;
-        transform: translateX(5px);
-    }
-
-    .account-item.active {
-        background-color: #e3f2fd;
-        border-left: 4px solid #1a73e8;
-    }
-
-    .new-account-button {
-        width: 100%;
-        margin-top: 10px;
-        background-color: #28a745;
-    }
-
-    .new-account-button:hover {
-        background-color: #218838;
-    }
-
-    .usage-info {
-        text-align: center;
-        margin: 10px 0;
-        padding: 10px;
-        background-color: #e8f0fe;
-        border-radius: 8px;
-        font-weight: bold;
-    }
-
-    .codes-section {
-        margin-top: 20px;
-        padding: 15px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        border: 1px solid #e1e4e8;
-    }
-
-    .code-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px;
-        margin: 8px 0;
-        background-color: white;
-        border-radius: 6px;
-        border: 1px solid #e1e4e8;
-        transition: transform 0.2s;
-    }
-
-    .code-item:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    .code-item .uses {
-        color: #28a745;
-        font-weight: bold;
-        padding: 4px 8px;
-        border-radius: 12px;
-        background-color: #e8f5e9;
-    }
-
-    .code-item .expired {
-        color: #dc3545;
-        background-color: #fef0f0;
-    }
-
-    .game-info {
-        text-align: center;
-        margin: 15px 0;
-        padding: 15px;
-        background-color: #e8f0fe;
-        border-radius: 8px;
-    }
-
-    .progress-bar {
-        width: 100%;
-        height: 8px;
-        background-color: #e1e4e8;
-        border-radius: 4px;
-        margin: 10px 0;
-        overflow: hidden;
-    }
-
-    .progress-fill {
-        height: 100%;
-        background-color: #1a73e8;
-        transition: width 0.3s ease;
-    }
-
-    .reward-notification {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background-color: #4caf50;
-        color: white;
-        padding: 25px;
-        border-radius: 10px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.3);
-        z-index: 1000;
-        text-align: center;
-        animation: popIn 0.3s ease-out;
-    }
-
-    .uses-counter {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background-color: #1a73e8;
-        color: white;
-        padding: 5px 15px;
-        border-radius: 20px;
-        font-size: 0.9em;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-
-    @keyframes popIn {
-        0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
-        100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    }
-
-    /* Mobile Responsiveness */
-    @media (max-width: 768px) {
         body {
-            padding: 10px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
         }
 
+        /* Layout */
         .container {
-            padding: 15px;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
 
+        /* Auth Container */
+        .auth-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Chat Interface */
+        .chat-container {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            max-width: 800px;
+        }
+
+        /* Game Container */
+        .game-container {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            max-width: 600px;
+            padding: 20px;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+        }
+
+        /* Buttons */
         button {
+            background-color: #1a73e8;
+            color: white;
+            border: none;
             padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
         }
 
-        .free-code {
-            font-size: 20px;
+        button:hover {
+            background-color: #1557b0;
         }
-    }
 
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-        .code-item {
-            background-color: #f8f9fa;
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Chat Elements */
+        #chatbox {
+            height: 400px;
+            padding: 15px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
         }
 
         .message {
-            border: 1px solid rgba(255,255,255,0.1);
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 80%;
         }
-    }
-</style>
+
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: auto;
+            color: #1557b0;
+        }
+
+        .bot-message {
+            background-color: #f5f5f5;
+            margin-right: auto;
+            color: #333;
+        }
+
+        /* Game Elements */
+        #gameCanvas {
+            border: 2px solid #1a73e8;
+            border-radius: 5px;
+            margin: 10px auto;
+            display: block;
+        }
+
+        .game-info {
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #e3f2fd;
+            border-radius: 5px;
+        }
+
+        /* Usage Counter */
+        .usage-counter {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background-color: white;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .tab.active {
+            background-color: #1a73e8;
+            color: white;
+        }
+
+        /* Access Codes */
+        .access-codes {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .code-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: white;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e1e4e8;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #1a73e8;
+            transition: width 0.3s ease;
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 5px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .notification.success {
+            background-color: #4caf50;
+        }
+
+        .notification.error {
+            background-color: #f44336;
+        }
+
+        .notification.show {
+            opacity: 1;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1a73e8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Error Messages */
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .auth-container {
+                margin: 20px auto;
+                padding: 15px;
+            }
+
+            .chat-container {
+                margin: 10px;
+            }
+
+            #chatbox {
+                height: 300px;
+            }
+
+            .usage-counter {
+                top: 10px;
+                right: 10px;
+                padding: 5px 10px;
+                font-size: 14px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <h1>talk with ai</h1>
-        <div class="info-banner">
-    <h2>Welcome to AI Chat! 🤖</h2>
-    <p>Here is a free access code to get you started:</p>
-    <div class="free-code">TEST5</div>
-    <p>This code gives you 5 free uses to experience our AI chat system.</p>
-    <p>Want unlimited or more uses? Email us at <a href="mailto:benchorev2@gmail.com" class="contact-link">benchorev2@gmail.com</a></p>
-</div>
-
-
-        <div class="account-switcher">
-            <div class="current-account">
-                <p>Current Account: <span id="currentAccountId"></span></p>
-                <button onclick="toggleAccountMenu()">Switch Account</button>
-            </div>
-            <div id="accountMenu" class="account-menu">
-                <div id="accountsList"></div>
-                <button onclick="createNewAccount()" class="new-account-button">Create New Account</button>
-            </div>
+    <!-- Auth Container -->
+    <div id="authContainer" class="auth-container">
+        <div id="loginForm">
+            <h2>Login</h2>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <div class="error-message" id="loginError"></div>
+                <button type="submit">Login</button>
+            </form>
+            <p style="margin-top: 15px; text-align: center;">
+                Don't have an account? <a href="#" onclick="toggleForms()">Register</a>
+            </p>
         </div>
 
-        <div id="accessForm">
-            <div class="input-area">
-                <input type="text" id="accessCode" placeholder="Enter access code">
-                <button onclick="verifyAccess()">Start Chat</button>
+        <div id="registerForm" style="display: none;">
+            <h2>Register</h2>
+            <form onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label for="registerUsername">Username</label>
+                    <input type="text" id="registerUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" required>
+                </div>
+                <div class="error-message" id="registerError"></div>
+                <button type="submit">Register</button>
+            </form>
+            <p style="margin-top: 15px; text-align: center;">
+                Already have an account? <a href="#" onclick="toggleForms()">Login</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="appContainer" style="display: none;">
+        <!-- Header -->
+        <div class="header">
+            <div class="user-info">
+                <span id="usernameDisplay"></span>
+                <span id="usesDisplay"></span>
             </div>
-            <div id="personalCodes" class="codes-section" style="display: none;">
-                <h3>Your Access Codes</h3>
-                <div id="codesList"></div>
-            </div>
+            <button onclick="logout()">Logout</button>
         </div>
 
-        <div id="chatInterface" style="display: none;">
-            <div class="usage-info">
-                Remaining uses: <span id="usageCounter">-</span>
-            </div>
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('chat')">Chat</div>
+            <div class="tab" onclick="switchTab('game')">Game</div>
+            <div class="tab" onclick="switchTab('codes')">Access Codes</div>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="chatContainer" class="chat-container">
             <div id="chatbox"></div>
             <div class="input-area">
-                <input type="text" id="messageInput" placeholder="Type your message here...">
+                <input type="text" id="messageInput" placeholder="Type your message...">
                 <button onclick="sendMessage()">Send</button>
             </div>
         </div>
-    </div>
 
-    <div class="container">
-        <h2>Play to Earn Rewards! 🎮</h2>
-        <div class="game-info">
-            <p>Current Score: <span id="score">0</span></p>
-            <div id="progressContainer">
-                <p>Progress to Next Reward:</p>
+        <!-- Game Container -->
+        <div id="gameContainer" class="game-container" style="display: none;">
+            <div class="game-info">
+                <p>Score: <span id="scoreDisplay">0</span></p>
                 <div class="progress-bar">
-                    <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    <div id="progressFill" class="progress-fill"></div>
                 </div>
-                <p id="nextReward">Score 100 points for your first reward!</p>
+                <p>Next Reward: <span id="nextRewardDisplay">100 points</span></p>
+            </div>
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+            <button id="startGameBtn" onclick="startGame()">Start Game</button>
+        </div>
+
+        <!-- Access Codes Container -->
+        <div id="codesContainer" class="container" style="display: none;">
+            <div class="access-codes">
+                <h3>Your Access Codes</h3>
+                <div id="codesList"></div>
+                <div class="form-group" style="margin-top: 20px;">
+                    <input type="text" id="newCode" placeholder="Enter access code">
+                    <button onclick="redeemCode()">Redeem Code</button>
+                </div>
             </div>
         </div>
-        <canvas id="gameCanvas" width="400" height="400"></canvas>
-        <div style="text-align: center; margin-top: 15px;">
-            <button id="startButton" onclick="startGame()">Start Game</button>
-        </div>
     </div>
 
+    <!-- Loading Spinner -->
+    <div id="spinner" class="spinner"></div>
+
+    <!-- Notifications -->
+    <div id="notification" class="notification"></div>
+
     <script>
-        let userId = localStorage.getItem('userId');
-        let currentAccessCode = '';
+        // Global Variables
+        let currentUser = null;
         let gameActive = false;
-        let score = 0;
+        let gameScore = 0;
         let playerX = 200;
         let objects = [];
-        let currentUsesLeft = 0;
+        let gameInterval = null;
+        let usesRemaining = 0;
 
-        async function initUser() {
-            if (!userId) {
-                try {
-                    const response = await fetch('/init-user', { method: 'POST' });
-                    const data = await response.json();
-                    userId = data.userId;
-                    localStorage.setItem('userId', userId);
-                } catch (error) {
-                    console.error('User initialization failed:', error);
-                }
-            }
-            document.getElementById('currentAccountId').textContent = formatUserId(userId);
-            document.getElementById('personalCodes').style.display = 'block';
-            loadAccounts();
-            updatePersonalCodes();
-        }
-
-        function formatUserId(id) {
-            return id.substring(0, 8) + '...';
-        }
-
-        async function loadAccounts() {
-            try {
-                const response = await fetch('/get-accounts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    updateAccountsList(data.accounts);
-                }
-            } catch (error) {
-                console.error('Error loading accounts:', error);
-            }
-        }
-
-        function updateAccountsList(accounts) {
-            const accountsList = document.getElementById('accountsList');
-            accountsList.innerHTML = '';
+        // Auth Functions
+        async function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
             
-            accounts.forEach(account => {
-                const accountDiv = document.createElement('div');
-                accountDiv.className = `account-item ${account.id === userId ? 'active' : ''}`;
-                accountDiv.innerHTML = `
-                    <span class="account-id">${formatUserId(account.id)}</span>
-                    <span class="account-score">Score: ${account.session.score}</span>
-                `;
-                accountDiv.onclick = () => switchAccount(account.id);
-                accountsList.appendChild(accountDiv);
-            });
-        }
-
-        async function switchAccount(newUserId) {
+            showSpinner();
             try {
-                const response = await fetch('/switch-account', {
+                const response = await fetch('/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, newUserId })
+                    body: JSON.stringify({ username, password })
                 });
-                
+
                 const data = await response.json();
                 
                 if (data.success) {
-                    userId = newUserId;
-                    localStorage.setItem('userId', userId);
-                    document.getElementById('currentAccountId').textContent = formatUserId(userId);
-                    loadAccounts();
-                    updatePersonalCodes();
-                    resetChatInterface();
-                    toggleAccountMenu();
-                }
-            } catch (error) {
-                console.error('Error switching accounts:', error);
-            }
-        }
-
-        function resetChatInterface() {
-            document.getElementById('chatInterface').style.display = 'none';
-            document.getElementById('accessForm').style.display = 'block';
-            document.getElementById('chatbox').innerHTML = '';
-            currentAccessCode = '';
-        }
-
-        async function createNewAccount() {
-            try {
-                const response = await fetch('/init-user', { method: 'POST' });
-                const data = await response.json();
-                await switchAccount(data.userId);
-            } catch (error) {
-                console.error('Error creating new account:', error);
-            }
-        }
-
-        async function verifyAccess() {
-            const accessCode = document.getElementById('accessCode').value.trim();
-            
-            try {
-                const response = await fetch('/verify-access', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ accessCode, userId })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    document.getElementById('accessForm').style.display = 'none';
-                    document.getElementById('chatInterface').style.display = 'block';
-                    currentAccessCode = accessCode;
-                    currentUsesLeft = data.usesLeft;
-                    updateUsageCounter();
-                    addMessage('System: Chat started! How can I help you?', 'bot-message');
+                    currentUser = username;
+                    usesRemaining = data.usesRemaining;
+                    gameScore = data.gameScore;
+                    
+                    document.getElementById('authContainer').style.display = 'none';
+                    document.getElementById('appContainer').style.display = 'block';
+                    
+                    updateUserDisplay();
+                    loadChatHistory();
+                    showNotification('Login successful', 'success');
                 } else {
-                    alert('Invalid access code');
+                    showError('loginError', data.error);
                 }
             } catch (error) {
-                alert('Error verifying access code');
+                showError('loginError', 'Login failed. Please try again.');
+            } finally {
+                hideSpinner();
             }
         }
 
-        function updateUsageCounter() {
-            const counter = document.getElementById('usageCounter');
-            counter.textContent = currentUsesLeft === Infinity ? 'Unlimited' : currentUsesLeft;
-            if (currentUsesLeft <= 2 && currentUsesLeft !== Infinity) {
-                counter.style.color = '#dc3545';
-            } else {
-                counter.style.color = 'inherit';
+        async function handleRegister(event) {
+            event.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (password !== confirmPassword) {
+                showError('registerError', 'Passwords do not match');
+                return;
+            }
+
+            showSpinner();
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showNotification('Registration successful! Please login.', 'success');
+                    toggleForms();
+                } else {
+                    showError('registerError', data.error);
+                }
+            } catch (error) {
+                showError('registerError', 'Registration failed. Please try again.');
+            } finally {
+                hideSpinner();
             }
         }
 
+        async function logout() {
+            try {
+                await fetch('/logout', { method: 'POST' });
+                currentUser = null;
+                document.getElementById('authContainer').style.display = 'block';
+                document.getElementById('appContainer').style.display = 'none';
+                resetGame();
+                showNotification('Logged out successfully', 'success');
+            } catch (error) {
+                showNotification('Logout failed', 'error');
+            }
+        }
+
+        // Chat Functions
         async function sendMessage() {
+            if (usesRemaining <= 0) {
+                showNotification('No uses remaining. Play games to earn more!', 'error');
+                return;
+            }
+
             const messageInput = document.getElementById('messageInput');
             const message = messageInput.value.trim();
             
             if (!message) return;
-            if (currentUsesLeft <= 0 && currentUsesLeft !== Infinity) {
-                alert('No uses remaining. Please use a different access code.');
-                return;
-            }
 
-            addMessage('You: ' + message, 'user-message');
             messageInput.value = '';
+            addMessage('You: ' + message, 'user-message');
 
+            showSpinner();
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message,
-                        accessCode: currentAccessCode,
-                        userId
-                    })
+                    body: JSON.stringify({ message })
                 });
 
                 const data = await response.json();
                 
                 if (data.success) {
                     addMessage('AI: ' + data.response, 'bot-message');
-                    currentUsesLeft = data.usesLeft;
-                    updateUsageCounter();
-                    
-                    if (currentUsesLeft <= 0) {
-                        addMessage('System: You have run out of uses for this code.', 'bot-message');
-                    }
+                    usesRemaining = data.usesRemaining;
+                    updateUserDisplay();
                 } else {
-                    alert(data.error || 'Error sending message');
+                    showNotification(data.error, 'error');
                 }
             } catch (error) {
-                alert('Error communicating with server');
+                showNotification('Failed to send message', 'error');
+            } finally {
+                hideSpinner();
             }
         }
 
@@ -586,13 +561,36 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
+        async function loadChatHistory() {
+            try {
+                const response = await fetch('/user-data');
+                const data = await response.json();
+                
+                if (data.success && data.data.chatHistory) {
+                    const chatbox = document.getElementById('chatbox');
+                    chatbox.innerHTML = '';
+                    
+                    data.data.chatHistory.forEach(chat => {
+                        addMessage('You: ' + chat.message, 'user-message');
+                        addMessage('AI: ' + chat.response, 'bot-message');
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load chat history:', error);
+            }
+        }
+
+        // Game Functions
         function startGame() {
             if (gameActive) return;
+            
             gameActive = true;
-            score = 0;
+            gameScore = 0;
             objects = [];
-            updateScore();
-            document.getElementById('startButton').disabled = true;
+            document.getElementById('startGameBtn').disabled = true;
+            document.getElementById('scoreDisplay').textContent = '0';
+            
+            updateGameProgress();
             gameLoop();
             spawnObjects();
         }
@@ -622,8 +620,8 @@
                 if (obj.y > 350 && obj.y < 370) {
                     if (Math.abs(obj.x - playerX) < 35) {
                         if (obj.type === 'good') {
-                            score += 10;
-                            updateScore();
+                            gameScore += 10;
+                            updateGameProgress();
                         } else {
                             endGame();
                         }
@@ -654,107 +652,167 @@
 
         async function endGame() {
             gameActive = false;
-            document.getElementById('startButton').disabled = false;
+            document.getElementById('startGameBtn').disabled = false;
             
             try {
                 const response = await fetch('/game-score', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, score })
+                    body: JSON.stringify({ score: gameScore })
                 });
-                
+
                 const data = await response.json();
                 
                 if (data.success) {
-                    if (data.newReward) {
-                        showRewardNotification(data.newReward);
-                        updatePersonalCodes();
-                    }
+                    usesRemaining = data.usesRemaining;
+                    updateUserDisplay();
                     
-                    if (data.nextReward) {
-                        updateProgress(data.totalScore, data.nextReward);
+                    if (data.rewards && data.rewards.length > 0) {
+                        showNotification(`New reward earned! +${data.rewards[0].uses} uses`, 'success');
                     }
                 }
             } catch (error) {
-                console.error('Error submitting score:', error);
+                console.error('Failed to submit score:', error);
             }
         }
 
-        function updateScore() {
-            document.getElementById('score').textContent = score;
-        }
-
-        function updateProgress(currentScore, nextReward) {
+        function updateGameProgress() {
+            const scoreDisplay = document.getElementById('scoreDisplay');
             const progressFill = document.getElementById('progressFill');
-            const nextRewardText = document.getElementById('nextReward');
+            const nextRewardDisplay = document.getElementById('nextRewardDisplay');
             
-            if (nextReward) {
-                const percentage = (currentScore / nextReward.total) * 100;
-                progressFill.style.width = `${Math.min(100, percentage)}%`;
-                nextRewardText.textContent = 
-                    `Score ${nextReward.pointsNeeded} more points for ${nextReward.tier} reward!`;
-            } else {
-                progressFill.style.width = '100%';
-                nextRewardText.textContent = 'All rewards earned!';
-            }
+            scoreDisplay.textContent = gameScore;
+            
+            // Calculate next reward threshold
+            const thresholds = [100, 250, 500, 1000];
+            let nextThreshold = thresholds.find(t => gameScore < t) || thresholds[thresholds.length - 1];
+            
+            const progress = (gameScore % nextThreshold) / nextThreshold * 100;
+            progressFill.style.width = `${progress}%`;
+            nextRewardDisplay.textContent = `${nextThreshold - (gameScore % nextThreshold)} points to next reward`;
         }
 
-        function showRewardNotification(reward) {
-            const notification = document.createElement('div');
-            notification.className = 'reward-notification';
-            notification.innerHTML = `
-                <h3>🎉 New Reward Earned! 🎉</h3>
-                <p>You've earned a ${reward.tier} access code:</p>
-                <p style="font-family: monospace; font-size: 1.2em;">${reward.code}</p>
-                <p>(${reward.uses} uses)</p>
-            `;
+        // Access Code Functions
+        async function redeemCode() {
+            const codeInput = document.getElementById('newCode');
+            const code = codeInput.value.trim();
             
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 5000);
-        }
-
-        async function updatePersonalCodes() {
-            const codesList = document.getElementById('codesList');
-            if (!codesList) return;
+            if (!code) return;
             
             try {
-                const response = await fetch('/game-score', {
+                const response = await fetch('/redeem-code', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, score: 0 })
+                    body: JSON.stringify({ code })
                 });
-                
+
                 const data = await response.json();
                 
-                if (data.earnedCodes) {
+                if (data.success) {
+                    usesRemaining = data.usesRemaining;
+                    updateUserDisplay();
+                    showNotification(data.message, 'success');
+                    codeInput.value = '';
+                    updateCodesList();
+                } else {
+                    showNotification(data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to redeem code', 'error');
+            }
+        }
+
+        async function updateCodesList() {
+            try {
+                const response = await fetch('/user-data');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const codesList = document.getElementById('codesList');
                     codesList.innerHTML = '';
-                    data.earnedCodes.forEach(code => {
-                        const codeDiv = document.createElement('div');
-                        codeDiv.className = 'code-item';
-                        codeDiv.innerHTML = `
-                            <div>
-                                <div>${code.tier}</div>
-                                <div style="font-family: monospace;">${code.code}</div>
-                            </div>
-                            <div class="uses ${code.uses <= 0 ? 'expired' : ''}">
-                                ${code.uses === Infinity ? 'Unlimited' : `${code.uses} uses`}
-                            </div>
+                    
+                    data.data.accessCodes.forEach(code => {
+                        const div = document.createElement('div');
+                        div.className = 'code-item';
+                        div.innerHTML = `
+                            <span>${code}</span>
+                            <span>${code === 'TEST5' ? '5 uses' : 'Custom code'}</span>
                         `;
-                        codesList.appendChild(codeDiv);
+                        codesList.appendChild(div);
                     });
                 }
             } catch (error) {
-                console.error('Error updating personal codes:', error);
+                console.error('Failed to update codes list:', error);
             }
         }
 
-        function toggleAccountMenu() {
-            const menu = document.getElementById('accountMenu');
-            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        // UI Functions
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+            
+            document.getElementById('chatContainer').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('codesContainer').style.display = 'none';
+            
+            document.getElementById(`${tab}Container`).style.display = 'block';
+            
+            if (tab === 'codes') {
+                updateCodesList();
+            }
+        }
+
+        function toggleForms() {
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            
+            loginForm.style.display = loginForm.style.display === 'none' ? 'block' : 'none';
+            registerForm.style.display = registerForm.style.display === 'none' ? 'block' : 'none';
+            
+            // Clear forms and errors
+            document.querySelectorAll('form').forEach(form => form.reset());
+            document.querySelectorAll('.error-message').forEach(error => error.style.display = 'none');
+        }
+
+        function updateUserDisplay() {
+            document.getElementById('usernameDisplay').textContent = currentUser;
+            document.getElementById('usesDisplay').textContent = `Uses: ${usesRemaining}`;
+        }
+
+        function showSpinner() {
+            document.getElementById('spinner').style.display = 'block';
+        }
+
+        function hideSpinner() {
+            document.getElementById('spinner').style.display = 'none';
+        }
+
+        function showError(elementId, message) {
+            const errorElement = document.getElementById(elementId);
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
         }
 
         // Event Listeners
-        document.getElementById('gameCanvas').addEventListener('mousemove', (e) => {
+        document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        document.getElementById('gameCanvas')?.addEventListener('mousemove', (e) => {
             if (!gameActive) return;
             
             const canvas = document.getElementById('gameCanvas');
@@ -762,8 +820,8 @@
             playerX = Math.max(25, Math.min(375, e.clientX - rect.left));
         });
 
-        // Touch support for mobile
-        document.getElementById('gameCanvas').addEventListener('touchmove', (e) => {
+        // Mobile touch support
+        document.getElementById('gameCanvas')?.addEventListener('touchmove', (e) => {
             if (!gameActive) return;
             e.preventDefault();
             
@@ -773,32 +831,30 @@
             playerX = Math.max(25, Math.min(375, touch.clientX - rect.left));
         }, { passive: false });
 
-        // Enter key handlers
-        document.getElementById('messageInput')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
+        // Check authentication status on page load
+        async function checkAuth() {
+            try {
+                const response = await fetch('/check-auth');
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    currentUser = data.username;
+                    usesRemaining = data.usesRemaining;
+                    gameScore = data.gameScore;
+                    
+                    document.getElementById('authContainer').style.display = 'none';
+                    document.getElementById('appContainer').style.display = 'block';
+                    
+                    updateUserDisplay();
+                    loadChatHistory();
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
             }
-        });
+        }
 
-        document.getElementById('accessCode')?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                verifyAccess();
-            }
-        });
-
-        // Close account menu when clicking outside
-        document.addEventListener('click', (e) => {
-            const menu = document.getElementById('accountMenu');
-            const switcher = document.querySelector('.account-switcher');
-            if (!switcher.contains(e.target)) {
-                menu.style.display = 'none';
-            }
-        });
-
-        // Initialize everything
-        window.addEventListener('load', initUser);
+        // Initialize
+        window.addEventListener('load', checkAuth);
     </script>
 </body>
 </html>

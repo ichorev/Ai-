@@ -3,20 +3,46 @@
   "access_codes": {
     "TEST5": {
       "uses": 5,
-      "tier": "BASIC"
+      "tier": "BASIC",
+      "description": "Trial access code"
     },
     "PREMIUM50": {
       "uses": 50,
-      "tier": "PREMIUM"
+      "tier": "PREMIUM",
+      "description": "Premium user code"
     },
     "VIP100": {
       "uses": 100,
-      "tier": "VIP"
+      "tier": "VIP",
+      "description": "VIP user access"
     },
     "UNLIMITED": {
       "uses": "Infinity",
-      "tier": "ULTIMATE"
+      "tier": "ULTIMATE",
+      "description": "Unlimited access"
+    },
+    "GAME10": {
+      "uses": 10,
+      "tier": "REWARD",
+      "description": "Game reward code"
     }
   },
-  "game_stats": {}
+  "game_stats": {},
+  "system_config": {
+    "max_chat_history": 50,
+    "score_thresholds": {
+      "BRONZE": 100,
+      "SILVER": 250,
+      "GOLD": 500,
+      "PLATINUM": 1000
+    },
+    "rewards": {
+      "BRONZE": 5,
+      "SILVER": 15,
+      "GOLD": 30,
+      "PLATINUM": 50
+    },
+    "last_backup": null,
+    "version": "1.0.0"
+  }
 }

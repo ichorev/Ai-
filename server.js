@@ -1,18 +1,23 @@
-require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
-const { randomBytes, createHash } = require('crypto');
 const helmet = require('helmet');
 const compression = require('compression');
 const cors = require('cors');
-const moment = require('moment');
+const cookieParser = require('cookie-parser');
+const OpenAI = require('openai');
+
 const app = express();
 
-// Import OpenAI
-const OpenAI = require('openai');
+// Security middleware
+app.use(helmet({
+    contentSecurityPolicy: false
+}));
+app.use(compression());
+app.use(cors());
+app.use(cookieParser());
 
 // Check for API key
 if (!process.env.Apikey) {
@@ -25,147 +30,88 @@ const openai = new OpenAI({
     apiKey: process.env.Apikey.trim()
 });
 
-// Enhanced security middleware
-app.use(helmet({
-    contentSecurityPolicy: false,
-}));
-app.use(compression());
-app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+// Middleware
+app.use(express.json());
 app.use(express.static(path.join(__dirname)));
-
-// Session configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    secret: 'your-secret-key',
     resave: false,
     saveUninitialized: false,
-    cookie: {
+    cookie: { 
         secure: process.env.NODE_ENV === 'production',
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
 
-// File paths and data directories
-const DATA_DIR = 'data';
-const BACKUP_DIR = 'backups';
-const USERS_FILE = `${DATA_DIR}/users.json`;
-const CHAT_LOGS_FILE = `${DATA_DIR}/chat_logs.json`;
-const GAME_DATA_FILE = `${DATA_DIR}/game_data.json`;
+// Data file path
+const DATA_FILE = 'data.json';
 
-// Create necessary directories
-[DATA_DIR, BACKUP_DIR].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir);
-    }
-});
-
-// Data storage
-let users = new Map();
-let chatLogs = new Map();
-let gameData = new Map();
-
-// Access code configuration
-const ACCESS_CODES = {
-    'TEST5': { uses: 5, tier: 'BASIC' },
-    'PREMIUM50': { uses: 50, tier: 'PREMIUM' },
-    'VIP100': { uses: 100, tier: 'VIP' }
-};
-
-// Game reward tiers
-const REWARD_TIERS = {
-    BRONZE: { score: 100, reward: 5 },
-    SILVER: { score: 250, reward: 15 },
-    GOLD: { score: 500, reward: 30 },
-    PLATINUM: { score: 1000, reward: 50 }
-};
-
-// Data management functions
+// Load data
 function loadData() {
     try {
-        if (fs.existsSync(USERS_FILE)) {
-            users = new Map(Object.entries(JSON.parse(fs.readFileSync(USERS_FILE))));
+        if (!fs.existsSync(DATA_FILE)) {
+            const initialData = {
+                users: {},
+                access_codes: {
+                    "TEST5": {
+                        uses: 5,
+                        tier: "BASIC",
+                        description: "Trial access code"
+                    },
+                    "PREMIUM50": {
+                        uses: 50,
+                        tier: "PREMIUM",
+                        description: "Premium user code"
+                    },
+                    "VIP100": {
+                        uses: 100,
+                        tier: "VIP",
+                        description: "VIP user access"
+                    },
+                    "UNLIMITED": {
+                        uses: "Infinity",
+                        tier: "ULTIMATE",
+                        description: "Unlimited access"
+                    }
+                },
+                game_stats: {},
+                system_config: {
+                    max_chat_history: 50,
+                    score_thresholds: {
+                        BRONZE: 100,
+                        SILVER: 250,
+                        GOLD: 500,
+                        PLATINUM: 1000
+                    },
+                    rewards: {
+                        BRONZE: 5,
+                        SILVER: 15,
+                        GOLD: 30,
+                        PLATINUM: 50
+                    }
+                }
+            };
+            fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
+            return initialData;
         }
-        if (fs.existsSync(CHAT_LOGS_FILE)) {
-            chatLogs = new Map(Object.entries(JSON.parse(fs.readFileSync(CHAT_LOGS_FILE))));
-        }
-        if (fs.existsSync(GAME_DATA_FILE)) {
-            gameData = new Map(Object.entries(JSON.parse(fs.readFileSync(GAME_DATA_FILE))));
-        }
+        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     } catch (error) {
         console.error('Error loading data:', error);
-        createBackup(); // Create backup if data is corrupted
+        return { users: {}, access_codes: {}, game_stats: {} };
     }
 }
 
-function saveData() {
+// Save data
+function saveData(data) {
     try {
-        fs.writeFileSync(USERS_FILE, JSON.stringify(Object.fromEntries(users)));
-        fs.writeFileSync(CHAT_LOGS_FILE, JSON.stringify(Object.fromEntries(chatLogs)));
-        fs.writeFileSync(GAME_DATA_FILE, JSON.stringify(Object.fromEntries(gameData)));
-        createBackup();
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
     } catch (error) {
         console.error('Error saving data:', error);
     }
 }
 
-function createBackup() {
-    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
-    const backupPath = path.join(BACKUP_DIR, `backup_${timestamp}`);
-    
-    try {
-        if (!fs.existsSync(BACKUP_DIR)) {
-            fs.mkdirSync(BACKUP_DIR);
-        }
-        
-        fs.writeFileSync(`${backupPath}_users.json`, JSON.stringify(Object.fromEntries(users)));
-        fs.writeFileSync(`${backupPath}_chats.json`, JSON.stringify(Object.fromEntries(chatLogs)));
-        fs.writeFileSync(`${backupPath}_game.json`, JSON.stringify(Object.fromEntries(gameData)));
-        
-        // Keep only last 5 backups
-        const backups = fs.readdirSync(BACKUP_DIR);
-        if (backups.length > 15) {
-            backups.slice(0, -15).forEach(backup => {
-                fs.unlinkSync(path.join(BACKUP_DIR, backup));
-            });
-        }
-    } catch (error) {
-        console.error('Backup creation failed:', error);
-    }
-}
-
-// User management functions
-function createUser(username, hashedPassword) {
-    const userData = {
-        password: hashedPassword,
-        created: Date.now(),
-        lastLogin: null,
-        chatHistory: [],
-        accessCodes: ['TEST5'],
-        gameScore: 0,
-        usesRemaining: 5,
-        totalChats: 0,
-        rewards: [],
-        settings: {
-            theme: 'light',
-            notifications: true
-        }
-    };
-    users.set(username, userData);
-    saveData();
-    return userData;
-}
-
-function updateUserData(username, updates) {
-    const user = users.get(username);
-    if (user) {
-        Object.assign(user, updates);
-        users.set(username, user);
-        saveData();
-    }
-}
-
-// Initialize data
-loadData();
+// Keep data in memory
+let gameData = loadData();
 
 // Authentication middleware
 function requireAuth(req, res, next) {
@@ -177,45 +123,56 @@ function requireAuth(req, res, next) {
 
 // Rate limiting
 const rateLimit = new Map();
-function checkRateLimit(req, res, next) {
-    const key = req.ip + (req.session.username || '');
-    const now = Date.now();
-    const limit = rateLimit.get(key) || { count: 0, reset: now + 60000 };
+const RATE_LIMIT = 50; // requests per minute
+const RATE_WINDOW = 60000; // 1 minute in milliseconds
 
-    if (now > limit.reset) {
-        limit.count = 1;
-        limit.reset = now + 60000;
-    } else if (limit.count > 50) {
-        return res.status(429).json({ error: 'Too many requests' });
+function checkRateLimit(req, res, next) {
+    const ip = req.ip;
+    const now = Date.now();
+    const userRate = rateLimit.get(ip) || { count: 0, reset: now + RATE_WINDOW };
+
+    if (now > userRate.reset) {
+        userRate.count = 1;
+        userRate.reset = now + RATE_WINDOW;
+    } else if (userRate.count >= RATE_LIMIT) {
+        return res.status(429).json({ error: 'Too many requests, please try again later' });
     } else {
-        limit.count++;
+        userRate.count++;
     }
 
-    rateLimit.set(key, limit);
+    rateLimit.set(ip, userRate);
     next();
 }
 
-app.use(checkRateLimit);
-
 // Routes
-app.get('/', (req, res) => {
+app.get('/', checkRateLimit, (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.post('/register', async (req, res) => {
+app.post('/register', checkRateLimit, async (req, res) => {
     const { username, password } = req.body;
 
     if (!username || !password) {
         return res.json({ success: false, error: 'Missing username or password' });
     }
 
-    if (users.has(username)) {
+    if (gameData.users[username]) {
         return res.json({ success: false, error: 'Username already exists' });
     }
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const userData = createUser(username, hashedPassword);
+        gameData.users[username] = {
+            password: hashedPassword,
+            created: Date.now(),
+            lastLogin: null,
+            chatHistory: [],
+            accessCodes: ['TEST5'],
+            gameScore: 0,
+            usesRemaining: 5,
+            rewards: []
+        };
+        saveData(gameData);
         res.json({ success: true });
     } catch (error) {
         console.error('Registration error:', error);
@@ -223,30 +180,29 @@ app.post('/register', async (req, res) => {
     }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/login', checkRateLimit, async (req, res) => {
     const { username, password } = req.body;
-    const user = users.get(username);
+    const user = gameData.users[username];
 
     if (!user) {
         return res.json({ success: false, error: 'Invalid username or password' });
     }
 
     try {
-        const validPassword = await bcrypt.hash(password, 10);
+        const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
             return res.json({ success: false, error: 'Invalid username or password' });
         }
 
         user.lastLogin = Date.now();
-        updateUserData(username, { lastLogin: Date.now() });
+        gameData.users[username] = user;
+        saveData(gameData);
 
         req.session.username = username;
         res.json({
             success: true,
-            username,
             usesRemaining: user.usesRemaining,
-            gameScore: user.gameScore,
-            settings: user.settings
+            gameScore: user.gameScore
         });
     } catch (error) {
         console.error('Login error:', error);
@@ -254,33 +210,36 @@ app.post('/login', async (req, res) => {
     }
 });
 
-app.post('/logout', (req, res) => {
+app.post('/logout', requireAuth, (req, res) => {
     const username = req.session.username;
-    if (username) {
-        updateUserData(username, { lastLogout: Date.now() });
-    }
+    gameData.users[username].lastLogin = Date.now();
+    saveData(gameData);
     req.session.destroy();
     res.json({ success: true });
 });
 
-app.get('/user-data', requireAuth, (req, res) => {
-    const user = users.get(req.session.username);
-    if (user) {
-        const { password, ...userData } = user;
-        res.json({ success: true, data: userData });
+app.get('/check-auth', (req, res) => {
+    if (req.session.username) {
+        const user = gameData.users[req.session.username];
+        res.json({
+            authenticated: true,
+            username: req.session.username,
+            usesRemaining: user.usesRemaining,
+            gameScore: user.gameScore
+        });
     } else {
-        res.json({ success: false, error: 'User not found' });
+        res.json({ authenticated: false });
     }
 });
 
-app.post('/chat', requireAuth, async (req, res) => {
-    const { message } = req.body;
-    const username = req.session.username;
-    const user = users.get(username);
-
+app.post('/chat', requireAuth, checkRateLimit, async (req, res) => {
+    const user = gameData.users[req.session.username];
+    
     if (user.usesRemaining <= 0) {
-        return res.json({ success: false, error: 'No uses remaining' });
+        return res.json({ success: false, error: 'No uses remaining. Play games to earn more!' });
     }
+
+    const { message } = req.body;
 
     try {
         const completion = await openai.chat.completions.create({
@@ -290,110 +249,141 @@ app.post('/chat', requireAuth, async (req, res) => {
             temperature: 0.7,
         });
 
-        const response = completion.choices[0].message.content;
-
-        // Update user data
         user.usesRemaining--;
-        user.totalChats++;
         user.chatHistory.push({
             timestamp: Date.now(),
             message,
-            response,
+            response: completion.choices[0].message.content,
             usesLeft: user.usesRemaining
         });
 
-        // Limit chat history
-        if (user.chatHistory.length > 50) {
-            user.chatHistory = user.chatHistory.slice(-50);
+        // Limit chat history size
+        if (user.chatHistory.length > gameData.system_config.max_chat_history) {
+            user.chatHistory = user.chatHistory.slice(-gameData.system_config.max_chat_history);
         }
 
-        updateUserData(username, user);
-
-        // Log chat
-        const chatLog = chatLogs.get(username) || [];
-        chatLog.push({
-            timestamp: Date.now(),
-            message,
-            response,
-            usesLeft: user.usesRemaining
-        });
-        chatLogs.set(username, chatLog);
-        saveData();
+        gameData.users[req.session.username] = user;
+        saveData(gameData);
 
         res.json({
             success: true,
-            response,
+            response: completion.choices[0].message.content,
             usesRemaining: user.usesRemaining
         });
     } catch (error) {
         console.error('Chat error:', error);
-        res.json({ success: false, error: 'Failed to get response' });
+        res.json({ success: false, error: 'Failed to get AI response' });
     }
 });
 
-app.post('/game-score', requireAuth, (req, res) => {
+app.post('/game-score', requireAuth, checkRateLimit, (req, res) => {
     const { score } = req.body;
     const username = req.session.username;
-    const user = users.get(username);
+    const user = gameData.users[username];
+    const thresholds = gameData.system_config.score_thresholds;
+    const rewards = gameData.system_config.rewards;
+
+    // Update game stats
+    if (!gameData.game_stats[username]) {
+        gameData.game_stats[username] = {
+            highScore: 0,
+            totalGames: 0,
+            rewards: []
+        };
+    }
+
+    const stats = gameData.game_stats[username];
+    stats.totalGames++;
+    
+    if (score > stats.highScore) {
+        stats.highScore = score;
+    }
 
     user.gameScore += score;
 
     // Check for rewards
-    for (const [tier, data] of Object.entries(REWARD_TIERS)) {
-        if (user.gameScore >= data.score && 
-            !user.rewards.includes(tier)) {
+    Object.entries(thresholds).forEach(([tier, threshold]) => {
+        if (score >= threshold && !user.rewards.includes(tier)) {
             user.rewards.push(tier);
-            user.usesRemaining += data.reward;
+            user.usesRemaining += rewards[tier];
+            stats.rewards.push({
+                tier,
+                score,
+                earned: Date.now(),
+                usesAwarded: rewards[tier]
+            });
         }
-    }
+    });
 
-    updateUserData(username, user);
+    gameData.users[username] = user;
+    gameData.game_stats[username] = stats;
+    saveData(gameData);
 
     res.json({
         success: true,
         gameScore: user.gameScore,
         usesRemaining: user.usesRemaining,
-        rewards: user.rewards
+        highScore: stats.highScore
     });
 });
 
-app.post('/redeem-code', requireAuth, (req, res) => {
+app.post('/redeem-code', requireAuth, checkRateLimit, (req, res) => {
     const { code } = req.body;
     const username = req.session.username;
-    const user = users.get(username);
+    const user = gameData.users[username];
 
-    if (!ACCESS_CODES[code]) {
-        return res.json({ success: false, error: 'Invalid code' });
+    if (!gameData.access_codes[code]) {
+        return res.json({ success: false, error: 'Invalid access code' });
     }
 
     if (user.accessCodes.includes(code)) {
         return res.json({ success: false, error: 'Code already used' });
     }
 
+    const codeData = gameData.access_codes[code];
     user.accessCodes.push(code);
-    user.usesRemaining += ACCESS_CODES[code].uses;
 
-    updateUserData(username, user);
+    // Handle unlimited uses
+    if (codeData.uses === "Infinity") {
+        user.usesRemaining = Infinity;
+    } else {
+        user.usesRemaining += parseInt(codeData.uses);
+    }
+
+    gameData.users[username] = user;
+    saveData(gameData);
 
     res.json({
         success: true,
         usesRemaining: user.usesRemaining,
-        message: `Added ${ACCESS_CODES[code].uses} uses`
+        message: `Added ${codeData.uses} uses`
     });
 });
 
-app.post('/update-settings', requireAuth, (req, res) => {
-    const { settings } = req.body;
+app.get('/user-stats', requireAuth, (req, res) => {
     const username = req.session.username;
-    const user = users.get(username);
+    const user = gameData.users[username];
+    const stats = gameData.game_stats[username] || {
+        highScore: 0,
+        totalGames: 0,
+        rewards: []
+    };
 
-    user.settings = { ...user.settings, ...settings };
-    updateUserData(username, user);
-
-    res.json({ success: true, settings: user.settings });
+    res.json({
+        success: true,
+        stats: {
+            usesRemaining: user.usesRemaining,
+            gameScore: user.gameScore,
+            highScore: stats.highScore,
+            totalGames: stats.totalGames,
+            rewards: stats.rewards,
+            chatHistory: user.chatHistory.length,
+            accessCodes: user.accessCodes
+        }
+    });
 });
 
-// Error handling
+// Error handling middleware
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).json({
@@ -401,9 +391,6 @@ app.use((err, req, res, next) => {
         error: 'Internal server error'
     });
 });
-
-// Automatic backup every hour
-setInterval(createBackup, 3600000);
 
 // Start server
 const PORT = process.env.PORT || 3000;
@@ -413,9 +400,15 @@ app.listen(PORT, () => {
     console.log('Environment:', process.env.NODE_ENV || 'development');
 });
 
-// Graceful shutdown
+// Handle shutdown gracefully
 process.on('SIGTERM', () => {
     console.log('Received SIGTERM. Saving data and shutting down...');
-    saveData();
+    saveData(gameData);
     process.exit(0);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    saveData(gameData);
+    process.exit(1);
 });

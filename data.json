@@ -1,1 +1,22 @@
-
+{
+  "users": {},
+  "access_codes": {
+    "TEST5": {
+      "uses": 5,
+      "tier": "BASIC"
+    },
+    "PREMIUM50": {
+      "uses": 50,
+      "tier": "PREMIUM"
+    },
+    "VIP100": {
+      "uses": 100,
+      "tier": "VIP"
+    },
+    "UNLIMITED": {
+      "uses": "Infinity",
+      "tier": "ULTIMATE"
+    }
+  },
+  "game_stats": {}
+}

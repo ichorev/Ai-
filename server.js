@@ -1,36 +1,17 @@
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
-const bcrypt = require('bcryptjs');
 const session = require('express-session');
-const cookieParser = require('cookie-parser');
-const { v4: uuidv4 } = require('uuid');
+const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const moment = require('moment');
+const { v4: uuidv4 } = require('uuid');
+const fs = require('fs').promises;
 
 // Import OpenAI
 const OpenAI = require('openai');
 
-// Initialize express app
 const app = express();
-
-// Enhanced security middleware
-app.use(helmet({
-    contentSecurityPolicy: false
-}));
-app.use(compression());
-app.use(cors());
-app.use(cookieParser());
-
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 100 // limit each IP to 100 requests per windowMs
-});
-app.use(limiter);
 
 // Check for API key
 if (!process.env.Apikey) {
@@ -43,11 +24,37 @@ const openai = new OpenAI({
     apiKey: process.env.Apikey.trim()
 });
 
-// Middleware
+// Enhanced Security Middleware
+app.set('trust proxy', 1);
+
+app.use(helmet({
+    contentSecurityPolicy: false
+}));
+app.use(compression());
+app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    trustProxy: true,
+    handler: (req, res) => {
+        res.status(429).json({
+            success: false,
+            error: 'Too many requests, please try again later.'
+        });
+    }
+});
+
+app.use(limiter);
+
+// Session configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    secret: process.env.Apikey || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
     cookie: { 
@@ -60,8 +67,20 @@ app.use(session({
 const DATA_FILE = 'data.json';
 let gameData = null;
 
-// Load data function with error handling and backup
-function loadData() {
+// Constants
+const GAME_CONFIG = {
+    REWARD_THRESHOLDS: {
+        BRONZE: { score: 100, uses: 5 },
+        SILVER: { score: 250, uses: 15 },
+        GOLD: { score: 500, uses: 30 },
+        PLATINUM: { score: 1000, uses: 50 }
+    },
+    MAX_HISTORY: 50,
+    BACKUP_INTERVAL: 3600000 // 1 hour
+};
+
+// Load data with error handling
+async function loadData() {
     try {
         if (!fs.existsSync(DATA_FILE)) {
             const initialData = {
@@ -70,77 +89,39 @@ function loadData() {
                     "TEST5": {
                         uses: 5,
                         tier: "BASIC",
-                        description: "Trial access code",
-                        cooldown: 3600000
+                        description: "Trial access code"
                     },
                     "PREMIUM50": {
                         uses: 50,
                         tier: "PREMIUM",
-                        description: "Premium user code",
-                        cooldown: null
+                        description: "Premium access"
                     },
                     "VIP100": {
                         uses: 100,
                         tier: "VIP",
-                        description: "VIP user access",
-                        cooldown: null
+                        description: "VIP access"
                     },
                     "UNLIMITED": {
                         uses: "Infinity",
                         tier: "ULTIMATE",
-                        description: "Unlimited access",
-                        cooldown: null
+                        description: "Unlimited access"
                     }
                 },
                 game_stats: {},
                 system_config: {
-                    max_chat_history: 50,
-                    score_thresholds: {
-                        BRONZE: {
-                            score: 100,
-                            reward: {
-                                uses: 5,
-                                code_prefix: "BRONZE",
-                                cooldown: 1800000
-                            }
-                        },
-                        SILVER: {
-                            score: 250,
-                            reward: {
-                                uses: 15,
-                                code_prefix: "SILVER",
-                                cooldown: 3600000
-                            }
-                        },
-                        GOLD: {
-                            score: 500,
-                            reward: {
-                                uses: 30,
-                                code_prefix: "GOLD",
-                                cooldown: 7200000
-                            }
-                        },
-                        PLATINUM: {
-                            score: 1000,
-                            reward: {
-                                uses: 50,
-                                code_prefix: "PLATINUM",
-                                cooldown: null
-                            }
-                        }
-                    }
+                    max_chat_history: GAME_CONFIG.MAX_HISTORY,
+                    score_thresholds: GAME_CONFIG.REWARD_THRESHOLDS
                 }
             };
-            fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
+            await fs.writeFile(DATA_FILE, JSON.stringify(initialData, null, 2));
             return initialData;
         }
-        
-        const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-        createBackup(data); // Create backup after successful load
+        const data = JSON.parse(await fs.readFile(DATA_FILE, 'utf8'));
+        await createBackup(data);
         return data;
     } catch (error) {
         console.error('Error loading data:', error);
-        const backup = loadLatestBackup();
+        const backup = await loadLatestBackup();
         if (backup) {
             console.log('Loaded data from backup');
             return backup;
@@ -150,57 +131,63 @@ function loadData() {
 }
 
 // Save data with backup
-function saveData(data) {
+async function saveData(data) {
     try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-        createBackup(data);
+        await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
+        await createBackup(data);
     } catch (error) {
         console.error('Error saving data:', error);
     }
 }
 
 // Backup management
-function createBackup(data) {
-    const timestamp = moment().format('YYYY-MM-DD_HH-mm-ss');
+async function createBackup(data) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupDir = 'backups';
     const backupPath = path.join(backupDir, `backup_${timestamp}.json`);
 
     try {
         if (!fs.existsSync(backupDir)) {
-            fs.mkdirSync(backupDir);
+            await fs.mkdir(backupDir);
         }
 
-        fs.writeFileSync(backupPath, JSON.stringify(data, null, 2));
+        await fs.writeFile(backupPath, JSON.stringify(data, null, 2));
 
         // Keep only last 24 backups
-        const backups = fs.readdirSync(backupDir)
+        const backups = await fs.readdir(backupDir);
+        const sortedBackups = backups
             .filter(file => file.startsWith('backup_'))
             .sort()
             .reverse();
 
-        if (backups.length > 24) {
-            backups.slice(24).forEach(backup => {
-                fs.unlinkSync(path.join(backupDir, backup));
-            });
+        if (sortedBackups.length > 24) {
+            for (const backup of sortedBackups.slice(24)) {
+                await fs.unlink(path.join(backupDir, backup));
+            }
         }
     } catch (error) {
         console.error('Backup creation failed:', error);
     }
 }
 
-function loadLatestBackup() {
+// Load latest backup
+async function loadLatestBackup() {
     try {
         const backupDir = 'backups';
         if (!fs.existsSync(backupDir)) return null;
 
-        const backups = fs.readdirSync(backupDir)
+        const backups = await fs.readdir(backupDir);
+        const sortedBackups = backups
             .filter(file => file.startsWith('backup_'))
             .sort()
             .reverse();
 
-        if (backups.length === 0) return null;
+        if (sortedBackups.length === 0) return null;
 
-        const latestBackup = fs.readFileSync(path.join(backupDir, backups[0]), 'utf8');
+        const latestBackup = await fs.readFile(
+            path.join(backupDir, sortedBackups[0]), 
+            'utf8'
+        );
         return JSON.parse(latestBackup);
     } catch (error) {
         console.error('Error loading backup:', error);
@@ -209,39 +196,13 @@ function loadLatestBackup() {
 }
 
 // Initialize game data
-gameData = loadData();
+gameData = await loadData();
 
-// Session cleanup
-setInterval(() => {
-    const now = Date.now();
-    for (const username in gameData.users) {
-        const user = gameData.users[username];
-        if (user.lastActivity && (now - user.lastActivity > 24 * 60 * 60 * 1000)) {
-            // Reset daily stats for inactive users
-            user.dailyUses = 0;
-            user.lastActivity = now;
-        }
-    }
-    saveData(gameData);
-}, 60 * 60 * 1000); // Check every hour
-
-// Authentication middleware
+// User verification middleware
 function requireAuth(req, res, next) {
     if (!req.session.username) {
-        return res.status(401).json({ 
-            success: false, 
-            error: 'Authentication required',
-            redirect: '/login'
-        });
+        return res.status(401).json({ success: false, error: 'Authentication required' });
     }
-    
-    // Update last activity
-    const user = gameData.users[req.session.username];
-    if (user) {
-        user.lastActivity = Date.now();
-        gameData.users[req.session.username] = user;
-    }
-    
     next();
 }
 
@@ -250,6 +211,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Authentication routes
 app.post('/register', async (req, res) => {
     const { username, password } = req.body;
 
@@ -271,27 +233,19 @@ app.post('/register', async (req, res) => {
 
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const userId = uuidv4();
-        
         gameData.users[username] = {
-            id: userId,
+            id: uuidv4(),
             password: hashedPassword,
             created: Date.now(),
             lastLogin: null,
-            lastActivity: Date.now(),
             chatHistory: [],
             accessCodes: ['TEST5'],
             gameScore: 0,
             usesRemaining: 5,
-            dailyUses: 0,
-            rewards: [],
-            settings: {
-                theme: 'light',
-                notifications: true
-            }
+            rewards: []
         };
         
-        saveData(gameData);
+        await saveData(gameData);
         res.json({ success: true });
     } catch (error) {
         console.error('Registration error:', error);
@@ -308,35 +262,21 @@ app.post('/login', async (req, res) => {
     }
 
     try {
-        const validPassword = await bcrypt.compare(password, user.password);
+        const validPassword = await bcrypt.hash(password, 10);
         if (!validPassword) {
             return res.json({ success: false, error: 'Invalid username or password' });
         }
 
-        // Update user data
         user.lastLogin = Date.now();
-        user.lastActivity = Date.now();
-        
-        // Reset daily uses at midnight
-        const lastLoginDate = new Date(user.lastLogin).setHours(0, 0, 0, 0);
-        const today = new Date().setHours(0, 0, 0, 0);
-        if (lastLoginDate < today) {
-            user.dailyUses = 0;
-        }
-
         gameData.users[username] = user;
-        saveData(gameData);
+        await saveData(gameData);
 
-        // Set session
         req.session.username = username;
-        req.session.userId = user.id;
-
         res.json({
             success: true,
             username,
             usesRemaining: user.usesRemaining,
-            gameScore: user.gameScore,
-            settings: user.settings
+            gameScore: user.gameScore
         });
     } catch (error) {
         console.error('Login error:', error);
@@ -346,34 +286,15 @@ app.post('/login', async (req, res) => {
 
 app.post('/logout', requireAuth, (req, res) => {
     const username = req.session.username;
-    if (username && gameData.users[username]) {
-        gameData.users[username].lastActivity = Date.now();
+    if (username) {
+        gameData.users[username].lastLogin = Date.now();
         saveData(gameData);
     }
     req.session.destroy();
     res.json({ success: true });
 });
 
-app.get('/check-auth', (req, res) => {
-    if (!req.session.username) {
-        return res.json({ authenticated: false });
-    }
-
-    const user = gameData.users[req.session.username];
-    if (!user) {
-        req.session.destroy();
-        return res.json({ authenticated: false });
-    }
-
-    res.json({
-        authenticated: true,
-        username: req.session.username,
-        usesRemaining: user.usesRemaining,
-        gameScore: user.gameScore,
-        settings: user.settings
-    });
-});
-
+// Chat routes
 app.post('/chat', requireAuth, async (req, res) => {
     const username = req.session.username;
     const user = gameData.users[username];
@@ -385,7 +306,7 @@ app.post('/chat', requireAuth, async (req, res) => {
     if (user.usesRemaining <= 0) {
         return res.json({ 
             success: false, 
-            error: 'No uses remaining. Play games to earn more!'
+            error: 'No uses remaining. Play games to earn more!' 
         });
     }
 
@@ -399,33 +320,27 @@ app.post('/chat', requireAuth, async (req, res) => {
             temperature: 0.7,
         });
 
-        // Update usage and chat history
+        // Update user data
         user.usesRemaining--;
-        user.dailyUses++;
-        
-        // Add to chat history
-        const chatEntry = {
+        user.chatHistory.push({
             timestamp: Date.now(),
             message,
             response: completion.choices[0].message.content,
             usesLeft: user.usesRemaining
-        };
-        
-        user.chatHistory.push(chatEntry);
+        });
 
         // Limit chat history
-        if (user.chatHistory.length > gameData.system_config.max_chat_history) {
-            user.chatHistory = user.chatHistory.slice(-gameData.system_config.max_chat_history);
+        if (user.chatHistory.length > GAME_CONFIG.MAX_HISTORY) {
+            user.chatHistory = user.chatHistory.slice(-GAME_CONFIG.MAX_HISTORY);
         }
 
         gameData.users[username] = user;
-        saveData(gameData);
+        await saveData(gameData);
 
         res.json({
             success: true,
             response: completion.choices[0].message.content,
-            usesRemaining: user.usesRemaining,
-            dailyUses: user.dailyUses
+            usesRemaining: user.usesRemaining
         });
     } catch (error) {
         console.error('Chat error:', error);
@@ -433,16 +348,17 @@ app.post('/chat', requireAuth, async (req, res) => {
     }
 });
 
-app.post('/game-score', requireAuth, (req, res) => {
+// Game routes
+app.post('/game-score', requireAuth, async (req, res) => {
     const { score } = req.body;
     const username = req.session.username;
     const user = gameData.users[username];
-    
+
     if (!user) {
         return res.json({ success: false, error: 'User not found' });
     }
 
-    // Initialize or get user's game stats
+    // Update game stats
     if (!gameData.game_stats[username]) {
         gameData.game_stats[username] = {
             highScore: 0,
@@ -454,51 +370,42 @@ app.post('/game-score', requireAuth, (req, res) => {
     const stats = gameData.game_stats[username];
     stats.totalGames++;
     
-    // Update high score
     if (score > stats.highScore) {
         stats.highScore = score;
     }
 
-    // Update total score
     user.gameScore += score;
 
     // Check for rewards
-    const thresholds = gameData.system_config.score_thresholds;
-    Object.entries(thresholds).forEach(([tier, data]) => {
-        if (score >= data.score) {
-            // Generate unique reward code
-            const rewardCode = `${data.reward.code_prefix}_${username}_${Date.now()}`;
-            
-            // Check if user already has this tier
-            if (!user.rewards.includes(tier)) {
-                user.rewards.push(tier);
-                user.usesRemaining += data.reward.uses;
-                
-                stats.rewards.push({
-                    tier,
-                    code: rewardCode,
-                    score,
-                    earned: Date.now(),
-                    uses: data.reward.uses
-                });
-            }
+    let rewardEarned = false;
+    Object.entries(GAME_CONFIG.REWARD_THRESHOLDS).forEach(([tier, data]) => {
+        if (score >= data.score && !user.rewards.includes(tier)) {
+            user.rewards.push(tier);
+            user.usesRemaining += data.uses;
+            stats.rewards.push({
+                tier,
+                score,
+                earned: Date.now(),
+                uses: data.uses
+            });
+            rewardEarned = true;
         }
     });
 
-    // Save updates
     gameData.users[username] = user;
     gameData.game_stats[username] = stats;
-    saveData(gameData);
+    await saveData(gameData);
 
     res.json({
         success: true,
         gameScore: user.gameScore,
-        usesRemaining: user.usesRemaining,
         highScore: stats.highScore,
-        newRewards: stats.rewards.filter(r => r.earned > Date.now- 5000) // Show rewards earned in last 5 seconds
+        rewardEarned,
+        usesRemaining: user.usesRemaining
     });
 });
 
+// Code redemption
 app.post('/redeem-code', requireAuth, (req, res) => {
     const { code } = req.body;
     const username = req.session.username;
@@ -508,55 +415,34 @@ app.post('/redeem-code', requireAuth, (req, res) => {
         return res.json({ success: false, error: 'User not found' });
     }
 
-    // Check if code exists in global codes
-    if (gameData.access_codes[code]) {
-        if (user.accessCodes.includes(code)) {
-            return res.json({ success: false, error: 'Code already used' });
-        }
-
-        const codeData = gameData.access_codes[code];
-        user.accessCodes.push(code);
-
-        // Handle different types of codes
-        if (codeData.uses === "Infinity") {
-            user.usesRemaining = Infinity;
-        } else {
-            user.usesRemaining += parseInt(codeData.uses);
-        }
-
-        gameData.users[username] = user;
-        saveData(gameData);
-
-        return res.json({
-            success: true,
-            usesRemaining: user.usesRemaining,
-            message: `Added ${codeData.uses} uses`
-        });
+    if (!gameData.access_codes[code]) {
+        return res.json({ success: false, error: 'Invalid code' });
     }
 
-    // Check for personal reward codes
-    const stats = gameData.game_stats[username];
-    if (stats && stats.rewards) {
-        const reward = stats.rewards.find(r => r.code === code);
-        if (reward && !reward.redeemed) {
-            user.usesRemaining += reward.uses;
-            reward.redeemed = true;
-            
-            gameData.users[username] = user;
-            gameData.game_stats[username] = stats;
-            saveData(gameData);
-
-            return res.json({
-                success: true,
-                usesRemaining: user.usesRemaining,
-                message: `Redeemed reward code for ${reward.uses} uses`
-            });
-        }
+    if (user.accessCodes.includes(code)) {
+        return res.json({ success: false, error: 'Code already used' });
     }
 
-    return res.json({ success: false, error: 'Invalid code' });
+    const codeData = gameData.access_codes[code];
+    user.accessCodes.push(code);
+    
+    if (codeData.uses === "Infinity") {
+        user.usesRemaining = Infinity;
+    } else {
+        user.usesRemaining += parseInt(codeData.uses);
+    }
+
+    gameData.users[username] = user;
+    saveData(gameData);
+
+    res.json({
+        success: true,
+        usesRemaining: user.usesRemaining,
+        message: `Added ${codeData.uses} uses`
+    });
 });
 
+// User data route
 app.get('/user-data', requireAuth, (req, res) => {
     const username = req.session.username;
     const user = gameData.users[username];
@@ -565,18 +451,6 @@ app.get('/user-data', requireAuth, (req, res) => {
         return res.json({ success: false, error: 'User not found' });
     }
 
-    // Get user's personal chat history only
-    const userData = {
-        usesRemaining: user.usesRemaining,
-        gameScore: user.gameScore,
-        chatHistory: user.chatHistory,
-        accessCodes: user.accessCodes,
-        rewards: user.rewards,
-        settings: user.settings,
-        dailyUses: user.dailyUses
-    };
-
-    // Get game stats if they exist
     const stats = gameData.game_stats[username] || {
         highScore: 0,
         totalGames: 0,
@@ -585,42 +459,14 @@ app.get('/user-data', requireAuth, (req, res) => {
 
     res.json({
         success: true,
-        userData,
+        userData: {
+            usesRemaining: user.usesRemaining,
+            gameScore: user.gameScore,
+            chatHistory: user.chatHistory,
+            accessCodes: user.accessCodes,
+            rewards: user.rewards
+        },
         gameStats: stats
-    });
-});
-
-app.post('/clear-chat-history', requireAuth, (req, res) => {
-    const username = req.session.username;
-    const user = gameData.users[username];
-    
-    if (!user) {
-        return res.json({ success: false, error: 'User not found' });
-    }
-
-    user.chatHistory = [];
-    gameData.users[username] = user;
-    saveData(gameData);
-
-    res.json({ success: true });
-});
-
-app.post('/update-settings', requireAuth, (req, res) => {
-    const username = req.session.username;
-    const user = gameData.users[username];
-    const { settings } = req.body;
-    
-    if (!user) {
-        return res.json({ success: false, error: 'User not found' });
-    }
-
-    user.settings = { ...user.settings, ...settings };
-    gameData.users[username] = user;
-    saveData(gameData);
-
-    res.json({
-        success: true,
-        settings: user.settings
     });
 });
 
@@ -633,30 +479,43 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Cleanup old data periodically
+// Automatic backup every hour
+setInterval(() => {
+    if (gameData) {
+        createBackup(gameData);
+    }
+}, GAME_CONFIG.BACKUP_INTERVAL);
+
+// Start server
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log('API Key:', process.env.Apikey ? 'Present' : 'Missing');
+    console.log('Environment:', process.env.NODE_ENV || 'development');console.log('Data file:', DATA_FILE);
+});
+
+// Cleanup routine for old sessions and expired data
 setInterval(() => {
     try {
         const now = Date.now();
-        const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-        // Clean up old chat history
-        Object.keys(gameData.users).forEach(username => {
-            const user = gameData.users[username];
+        Object.entries(gameData.users).forEach(([username, user]) => {
+            // Clean up old chat history
             if (user.chatHistory) {
                 user.chatHistory = user.chatHistory.filter(chat => 
-                    (now - chat.timestamp) < maxAge
+                    (now - chat.timestamp) < (30 * 24 * 60 * 60 * 1000) // 30 days
                 );
             }
-        });
 
-        // Clean up old game stats
-        Object.keys(gameData.game_stats).forEach(username => {
-            const stats = gameData.game_stats[username];
-            if (stats.rewards) {
-                stats.rewards = stats.rewards.filter(reward => 
-                    !reward.redeemed || (now - reward.earned) < maxAge
-                );
+            // Reset daily stats if needed
+            if (user.lastLogin) {
+                const lastLoginDate = new Date(user.lastLogin).setHours(0, 0, 0, 0);
+                const today = new Date().setHours(0, 0, 0, 0);
+                if (lastLoginDate < today) {
+                    user.dailyUses = 0;
+                }
             }
+
+            gameData.users[username] = user;
         });
 
         saveData(gameData);
@@ -665,35 +524,61 @@ setInterval(() => {
     }
 }, 24 * 60 * 60 * 1000); // Run daily
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log('API Key:', process.env.Apikey ? 'Present' : 'Missing');
-    console.log('Environment:', process.env.NODE_ENV || 'development');
-    console.log('Data file:', DATA_FILE);
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        timestamp: Date.now(),
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        dataFileSize: fs.statSync(DATA_FILE).size
+    });
 });
 
-// Handle graceful shutdown
+// Graceful shutdown handlers
 process.on('SIGTERM', () => {
-    console.log('Received SIGTERM. Saving data and shutting down...');
-    saveData(gameData);
-    process.exit(0);
+    console.log('SIGTERM received. Shutting down gracefully...');
+    server.close(async () => {
+        console.log('Server closed. Saving final data...');
+        if (gameData) {
+            await saveData(gameData);
+            await createBackup(gameData);
+        }
+        process.exit(0);
+    });
+
+    // Force exit if graceful shutdown fails
+    setTimeout(() => {
+        console.log('Forcing shutdown after timeout');
+        process.exit(1);
+    }, 10000).unref();
 });
 
 process.on('SIGINT', () => {
-    console.log('Received SIGINT. Saving data and shutting down...');
-    saveData(gameData);
-    process.exit(0);
+    console.log('SIGINT received. Shutting down gracefully...');
+    server.close(async () => {
+        console.log('Server closed. Saving final data...');
+        if (gameData) {
+            await saveData(gameData);
+            await createBackup(gameData);
+        }
+        process.exit(0);
+    });
 });
 
-// Error handling for uncaught exceptions
-process.on('uncaughtException', (error) => {
+// Uncaught exception handler
+process.on('uncaughtException', async (error) => {
     console.error('Uncaught Exception:', error);
-    saveData(gameData);
+    if (gameData) {
+        await saveData(gameData);
+        await createBackup(gameData);
+    }
     process.exit(1);
 });
 
+// Unhandled rejection handler
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+module.exports = app;

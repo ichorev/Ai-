@@ -3,7 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chat System</title>
+    <title>AI Chat with Game Rewards</title>
+    
+    <!-- Firebase Scripts -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCcmRGmdwB1fBd59RUs0YFRCrVf3YwKnE8",
+            authDomain: "aiapp-7d391.firebaseapp.com",
+            databaseURL: "https://aiapp-7d391-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "aiapp-7d391",
+            storageBucket: "aiapp-7d391.firebasestorage.app",
+            messagingSenderId: "304975349762",
+            appId: "1:304975349762:web:72d2c99f611a0c3e28ff1b"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // Make Firebase services available globally
+        window.database = database;
+        window.dbRef = ref;
+        window.dbGet = get;
+        window.dbSet = set;
+        window.dbUpdate = update;
+    </script>
+
     <style>
         /* Reset and Base Styles */
         * {
@@ -25,7 +54,7 @@
             padding: 20px;
         }
 
-        /* Authentication Styles */
+        /* Auth Container */
         .auth-container {
             max-width: 400px;
             margin: 50px auto;
@@ -61,7 +90,7 @@
             box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
         }
 
-        /* Main Interface Styles */
+        /* Main Interface */
         .main-interface {
             display: none;
             padding: 20px;
@@ -92,7 +121,7 @@
             font-weight: 500;
         }
 
-        /* Tab Navigation */
+        /* Navigation Tabs */
         .tabs {
             display: flex;
             gap: 10px;
@@ -100,6 +129,7 @@
             background: white;
             padding: 10px;
             border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
         .tab {
@@ -124,6 +154,7 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             overflow: hidden;
+            margin-bottom: 20px;
         }
 
         #chatbox {
@@ -168,6 +199,7 @@
             border-radius: 10px;
             padding: 20px;
             text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         #gameCanvas {
@@ -197,79 +229,80 @@
             color: #1a73e8;
         }
 
-        /* Code Redemption */
-        .codes-container {
+        /* Account Switcher */
+        .account-switcher {
             background: white;
+            padding: 15px;
             border-radius: 10px;
-            padding: 20px;
-        }
-
-        .code-input {
-            display: flex;
-            gap: 10px;
             margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
 
-        .code-list {
-            border: 1px solid #eee;
-            border-radius: 8px;
-            overflow: hidden;
+        .account-list {
+            margin-top: 10px;
         }
 
-        .code-item {
+        .account-item {
             display: flex;
             justify-content: space-between;
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .code-item:last-child {
-            border-bottom: none;
-        }
-
-        /* Buttons */
-        button {
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 16px;
             transition: all 0.3s;
         }
 
-        button:hover {
-            background-color: #1557b0;
-            transform: translateY(-1px);
+        .account-item:hover {
+            background: #e3f2fd;
         }
 
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-            transform: none;
+        .account-item.active {
+            background: #e3f2fd;
+            border-left: 4px solid #1a73e8;
         }
 
-        /* Notifications */
-        .notification {
+        /* Rewards and Progress */
+        .progress-container {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e1e4e8;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #1a73e8;
+            transition: width 0.3s ease;
+        }
+
+        /* Reward Notifications */
+        .reward-notification {
             position: fixed;
             top: 20px;
             right: 20px;
             padding: 15px 25px;
-            border-radius: 8px;
             background-color: #4caf50;
             color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             transform: translateX(120%);
             transition: transform 0.3s;
             z-index: 1000;
         }
 
-        .notification.show {
+        .reward-notification.show {
             transform: translateX(0);
-        }
-
-        .notification.error {
-            background-color: #f44336;
         }
 
         /* Loading Spinner */
@@ -289,6 +322,39 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Error Messages */
+        .error-message {
+            color: #d32f2f;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: #ffebee;
+            display: none;
+        }
+
+        /* Buttons */
+        button {
+            padding: 12px 24px;
+            background-color: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background-color: #1557b0;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         /* Responsive Design */
         @media (max-width: 768px) {
             .container {
@@ -300,14 +366,6 @@
                 padding: 20px;
             }
 
-            #chatbox {
-                height: 400px;
-            }
-
-            .message {
-                max-width: 90%;
-            }
-
             .tabs {
                 flex-wrap: wrap;
             }
@@ -316,116 +374,141 @@
                 flex-direction: column;
                 gap: 10px;
             }
+
+            #chatbox {
+                height: 400px;
+            }
+
+            .message {
+                max-width: 90%;
+            }
         }
     </style>
 </head>
 <body>
-    <!-- Auth Container -->
-    <div id="authContainer" class="auth-container">
-        <div id="loginForm">
-            <h2 style="text-align: center; margin-bottom: 20px; color: #1a73e8;">Login</h2>
-            <form onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label for="loginUsername">Username</label>
-                    <input type="text" id="loginUsername" required autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword">Password</label>
-                    <input type="password" id="loginPassword" required autocomplete="current-password">
-                </div>
-                <div id="loginError" style="color: #f44336; margin-bottom: 10px; display: none;"></div>
-                <button type="submit" style="width: 100%;">Login</button>
-            </form>
-            <p style="text-align: center; margin-top: 15px;">
-                Don't have an account? <a href="#" onclick="toggleForms()" style="color: #1a73e8; text-decoration: none;">Register</a>
-            </p>
+    <div class="container">
+        <!-- Auth Container -->
+        <div id="authContainer" class="auth-container">
+            <div id="loginForm">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #1a73e8;">Login</h2>
+                <form onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label for="loginUsername">Username</label>
+                        <input type="text" id="loginUsername" required autofocus>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <div id="loginError" class="error-message"></div>
+                    <button type="submit" style="width: 100%;">Login</button>
+                </form>
+                <p style="text-align: center; margin-top: 15px;">
+                    Don't have an account? <a href="#" onclick="toggleForms()" style="color: #1a73e8; text-decoration: none;">Register</a>
+                </p>
+            </div>
+
+            <div id="registerForm" style="display: none;">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #1a73e8;">Register</h2>
+                <form onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label for="registerUsername">Username</label>
+                        <input type="text" id="registerUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Password</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" id="confirmPassword" required>
+                    </div>
+                    <div id="registerError" class="error-message"></div>
+                    <button type="submit" style="width: 100%;">Register</button>
+                </form>
+                <p style="text-align: center; margin-top: 15px;">
+                    Already have an account? <a href="#" onclick="toggleForms()" style="color: #1a73e8; text-decoration: none;">Login</a>
+                </p>
+            </div>
         </div>
 
-        <div id="registerForm" style="display: none;">
-            <h2 style="text-align: center; margin-bottom: 20px; color: #1a73e8;">Register</h2>
-            <form onsubmit="handleRegister(event)">
-                <div class="form-group">
-                    <label for="registerUsername">Username</label>
-                    <input type="text" id="registerUsername" required>
+        <!-- Main Interface -->
+        <div id="mainInterface" class="main-interface">
+            <!-- Header -->
+            <div class="header">
+                <div class="user-info">
+                    <span id="username"></span>
+                    <span id="usageCounter" class="usage-counter">Uses: 0</span>
                 </div>
-                <div class="form-group">
-                    <label for="registerPassword">Password</label>
-                    <input type="password" id="registerPassword" required>
+                <div class="account-controls">
+                    <button onclick="toggleAccountMenu()">Switch Account</button>
+                    <button onclick="logout()">Logout</button>
                 </div>
-                <div class="form-group">
-                    <label for="confirmPassword">Confirm Password</label>
-                    <input type="password" id="confirmPassword" required>
+            </div>
+
+            <!-- Account Switcher -->
+            <div id="accountMenu" class="account-switcher" style="display: none;">
+                <h3>Your Accounts</h3>
+                <div id="accountsList" class="account-list"></div>
+                <button onclick="createNewAccount()" class="new-account-button">Create New Account</button>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('chat')">Chat</div>
+                <div class="tab" onclick="switchTab('game')">Game</div>
+                <div class="tab" onclick="switchTab('rewards')">Rewards</div>
+            </div>
+
+            <!-- Chat Interface -->
+            <div id="chatContainer" class="chat-container">
+                <div id="chatbox"></div>
+                <div class="chat-input">
+                    <input type="text" id="messageInput" placeholder="Type your message..." style="flex-grow: 1;">
+                    <button onclick="sendMessage()">Send</button>
                 </div>
-                <div id="registerError" style="color: #f44336; margin-bottom: 10px; display: none;"></div>
-                <button type="submit" style="width: 100%;">Register</button>
-            </form>
-            <p style="text-align: center; margin-top: 15px;">
-                Already have an account? <a href="#" onclick="toggleForms()" style="color: #1a73e8; text-decoration: none;">Login</a>
-            </p>
+            </div>
+
+            <!-- Game Interface -->
+            <!-- Game Interface (continuation) -->
+            <div id="gameContainer" class="game-container" style="display: none;">
+                <div class="game-stats">
+                    <div class="game-stat">
+                        <div>Current Score</div>
+                        <div id="currentScore" class="stat-value">0</div>
+                    </div>
+                    <div class="game-stat">
+                        <div>High Score</div>
+                        <div id="highScore" class="stat-value">0</div>
+                    </div>
+                    <div class="game-stat">
+                        <div>Next Reward</div>
+                        <div id="nextReward" class="stat-value">100</div>
+                    </div>
+                </div>
+                <canvas id="gameCanvas" width="400" height="400"></canvas>
+                <button id="startGameBtn" onclick="startGame()">Start Game</button>
+            </div>
+
+            <!-- Rewards Interface -->
+            <div id="rewardsContainer" class="game-container" style="display: none;">
+                <h3>Your Rewards</h3>
+                <div class="progress-container">
+                    <div>Progress to Next Reward</div>
+                    <div class="progress-bar">
+                        <div id="rewardProgress" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div id="rewardsList"></div>
+            </div>
         </div>
+
+        <!-- Loading Spinner -->
+        <div id="spinner" class="spinner"></div>
+
+        <!-- Reward Notification -->
+        <div id="rewardNotification" class="reward-notification"></div>
     </div>
-
-    <!-- Main Interface -->
-    <div id="mainInterface" class="main-interface">
-        <div class="header">
-            <div class="user-info">
-                <span id="usernameDisplay"></span>
-                <span id="usesCounter" class="usage-counter">Uses: 0</span>
-            </div>
-            <button onclick="logout()">Logout</button>
-        </div>
-
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('chat')">Chat</div>
-            <div class="tab" onclick="switchTab('game')">Game</div>
-            <div class="tab" onclick="switchTab('codes')">Access Codes</div>
-        </div>
-
-        <!-- Chat Interface -->
-        <div id="chatContainer" class="chat-container">
-            <div id="chatbox"></div>
-            <div class="chat-input">
-                <input type="text" id="messageInput" placeholder="Type your message..." style="flex-grow: 1;">
-                <button onclick="sendMessage()">Send</button>
-            </div>
-        </div>
-
-        <!-- Game Interface -->
-        <div id="gameContainer" class="game-container" style="display: none;">
-            <div class="game-stats">
-                <div class="game-stat">
-                    <div>Current Score</div>
-                    <div id="currentScore" class="stat-value">0</div>
-                </div>
-                <div class="game-stat">
-                    <div>High Score</div>
-                    <div id="highScore" class="stat-value">0</div>
-                </div>
-                <div class="game-stat">
-                    <div>Next Reward</div>
-                    <div id="nextReward" class="stat-value">100</div>
-                </div>
-            </div>
-            <canvas id="gameCanvas" width="400" height="400"></canvas>
-            <button id="startGameBtn" onclick="startGame()">Start Game</button>
-        </div>
-
-        <!-- Codes Interface -->
-        <div id="codesContainer" class="codes-container" style="display: none;">
-            <div class="code-input">
-                <input type="text" id="codeInput" placeholder="Enter access code">
-                <button onclick="redeemCode()">Redeem Code</button>
-            </div>
-            <h3>Your Access Codes</h3>
-            <div id="codesList" class="code-list"></div>
-        </div>
-    </div>
-
-    <!-- Loading Spinner -->
-    <div id="spinner" class="spinner"></div>
-
-    <!-- Notification -->
-    <div id="notification" class="notification"></div>
 
     <script>
         // Global Variables
@@ -437,24 +520,44 @@
         let usesRemaining = 0;
         let highScore = 0;
 
-        // Authentication Functions
-        async function handleLogin(event) {
-            event.preventDefault();
-            const username = document.getElementById('loginUsername').value;
-            const password = document.getElementById('loginPassword').value;
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize event listeners
+            document.getElementById('messageInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
 
-            showSpinner();
+            document.getElementById('gameCanvas').addEventListener('mousemove', (e) => {
+                if (!gameActive) return;
+                const canvas = document.getElementById('gameCanvas');
+                const rect = canvas.getBoundingClientRect();
+                playerX = Math.max(25, Math.min(375, e.clientX - rect.left));
+            });
+
+            // Mobile touch support
+            document.getElementById('gameCanvas').addEventListener('touchmove', (e) => {
+                if (!gameActive) return;
+                e.preventDefault();
+                const canvas = document.getElementById('gameCanvas');
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches[0];
+                playerX = Math.max(25, Math.min(375, touch.clientX - rect.left));
+            }, { passive: false });
+
+            // Check authentication status
+            checkAuth();
+        });
+
+        async function checkAuth() {
             try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-
+                const response = await fetch('/check-auth');
                 const data = await response.json();
-
-                if (data.success) {
-                    currentUser = username;
+                
+                if (data.authenticated) {
+                    currentUser = data.username;
                     usesRemaining = data.usesRemaining;
                     highScore = data.gameScore;
                     
@@ -463,312 +566,9 @@
                     
                     updateUserDisplay();
                     loadChatHistory();
-                    updateCodesList();
-                    showNotification('Login successful', 'success');
-                } else {
-                    showError('loginError', data.error);
                 }
             } catch (error) {
-                showError('loginError', 'Login failed. Please try again.');
-            } finally {
-                hideSpinner();
-            }
-        }
-
-        async function handleRegister(event) {
-            event.preventDefault();
-            const username = document.getElementById('registerUsername').value;
-            const password = document.getElementById('registerPassword').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-
-            if (password !== confirmPassword) {
-                showError('registerError', 'Passwords do not match');
-                return;
-            }
-
-            showSpinner();
-            try {
-                const response = await fetch('/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-              const data = await response.json();
-
-                if (data.success) {
-                    showNotification('Registration successful! Please login.', 'success');
-                    toggleForms();
-                    document.getElementById('loginUsername').value = username;
-                } else {
-                    showError('registerError', data.error);
-                }
-            } catch (error) {
-                showError('registerError', 'Registration failed. Please try again.');
-            } finally {
-                hideSpinner();
-            }
-        }
-
-        async function logout() {
-            try {
-                await fetch('/logout', { method: 'POST' });
-                currentUser = null;
-                document.getElementById('authContainer').style.display = 'block';
-                document.getElementById('mainInterface').style.display = 'none';
-                resetGame();
-                showNotification('Logged out successfully', 'success');
-            } catch (error) {
-                showNotification('Logout failed', 'error');
-            }
-        }
-
-        // Chat Functions
-        async function sendMessage() {
-            if (usesRemaining <= 0) {
-                showNotification('No uses remaining. Play games to earn more!', 'error');
-                return;
-            }
-
-            const messageInput = document.getElementById('messageInput');
-            const message = messageInput.value.trim();
-            
-            if (!message) return;
-
-            messageInput.value = '';
-            addMessage('You: ' + message, 'user-message');
-
-            showSpinner();
-            try {
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message })
-                });
-
-                const data = await response.json();
-                
-                if (data.success) {
-                    addMessage('AI: ' + data.response, 'bot-message');
-                    usesRemaining = data.usesRemaining;
-                    updateUserDisplay();
-                } else {
-                    showNotification(data.error, 'error');
-                }
-            } catch (error) {
-                showNotification('Failed to send message', 'error');
-            } finally {
-                hideSpinner();
-            }
-        }
-
-        function addMessage(message, className) {
-            const chatbox = document.getElementById('chatbox');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message ' + className;
-            messageDiv.textContent = message;
-            chatbox.appendChild(messageDiv);
-            chatbox.scrollTop = chatbox.scrollHeight;
-        }
-
-        async function loadChatHistory() {
-            try {
-                const response = await fetch('/user-data');
-                const data = await response.json();
-                
-                if (data.success && data.userData.chatHistory) {
-                    const chatbox = document.getElementById('chatbox');
-                    chatbox.innerHTML = '';
-                    
-                    data.userData.chatHistory.forEach(chat => {
-                        addMessage('You: ' + chat.message, 'user-message');
-                        addMessage('AI: ' + chat.response, 'bot-message');
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to load chat history:', error);
-            }
-        }
-
-        // Game Functions
-        function startGame() {
-            if (gameActive) return;
-            
-            gameActive = true;
-            gameScore = 0;
-            objects = [];
-            document.getElementById('startGameBtn').disabled = true;
-            document.getElementById('currentScore').textContent = '0';
-            updateGameProgress();
-            gameLoop();
-            spawnObjects();
-        }
-
-        function gameLoop() {
-            if (!gameActive) return;
-            
-            const canvas = document.getElementById('gameCanvas');
-            const ctx = canvas.getContext('2d');
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw player
-            ctx.fillStyle = '#1a73e8';
-            ctx.fillRect(playerX - 25, 350, 50, 10);
-            
-            // Update and draw objects
-            for (let i = objects.length - 1; i >= 0; i--) {
-                const obj = objects[i];
-                obj.y += 3;
-                
-                ctx.beginPath();
-                ctx.arc(obj.x, obj.y, 10, 0, Math.PI * 2);
-                ctx.fillStyle = obj.type === 'good' ? '#4caf50' : '#f44336';
-                ctx.fill();
-                
-                if (obj.y > 350 && obj.y < 370) {
-                    if (Math.abs(obj.x - playerX) < 35) {
-                        if (obj.type === 'good') {
-                            gameScore += 10;
-                            updateGameProgress();
-                        } else {
-                            endGame();
-                        }
-                        objects.splice(i, 1);
-                    }
-                }
-                
-                if (obj.y > 400) {
-                    objects.splice(i, 1);
-                }
-            }
-            
-            requestAnimationFrame(gameLoop);
-        }
-
-        function spawnObjects() {
-            if (!gameActive) return;
-            
-            const obj = {
-                x: Math.random() * 360 + 20,
-                y: 0,
-                type: Math.random() > 0.3 ? 'good' : 'bad'
-            };
-            
-            objects.push(obj);
-            setTimeout(spawnObjects, 1000);
-        }
-
-        async function endGame() {
-            gameActive = false;
-            document.getElementById('startGameBtn').disabled = false;
-            
-            try {
-                const response = await fetch('/game-score', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ score: gameScore })
-                });
-
-                const data = await response.json();
-                
-                if (data.success) {
-                    usesRemaining = data.usesRemaining;
-                    highScore = Math.max(highScore, data.highScore);
-                    updateUserDisplay();
-                    updateGameProgress();
-                    
-                    if (data.newRewards && data.newRewards.length > 0) {
-                        data.newRewards.forEach(reward => {
-                            showNotification(`New reward earned: ${reward.tier}! +${reward.uses} uses`, 'success');
-                        });
-                        updateCodesList();
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to submit score:', error);
-            }
-        }
-
-        function updateGameProgress() {
-            document.getElementById('currentScore').textContent = gameScore;
-            document.getElementById('highScore').textContent = highScore;
-            
-            const nextThreshold = getNextThreshold(gameScore);
-            if (nextThreshold) {
-                document.getElementById('nextReward').textContent = nextThreshold - gameScore;
-            }
-        }
-
-        function getNextThreshold(score) {
-            const thresholds = [100, 250, 500, 1000];
-            return thresholds.find(t => t > score) || null;
-        }
-
-        // Access Code Functions
-        async function redeemCode() {
-            const code = document.getElementById('codeInput').value.trim();
-            if (!code) return;
-
-            try {
-                const response = await fetch('/redeem-code', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code })
-                });
-
-                const data = await response.json();
-                
-                if (data.success) {
-                    usesRemaining = data.usesRemaining;
-                    updateUserDisplay();
-                    showNotification(data.message, 'success');
-                    document.getElementById('codeInput').value = '';
-                    updateCodesList();
-                } else {
-                    showNotification(data.error, 'error');
-                }
-            } catch (error) {
-                showNotification('Failed to redeem code', 'error');
-            }
-        }
-
-        async function updateCodesList() {
-            try {
-                const response = await fetch('/user-data');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const codesList = document.getElementById('codesList');
-                    codesList.innerHTML = '';
-                    
-                    data.userData.accessCodes.forEach(code => {
-                        const div = document.createElement('div');
-                        div.className = 'code-item';
-                        div.innerHTML = `
-                            <span>${code}</span>
-                            <span>${code === 'TEST5' ? '5 uses' : 'Custom code'}</span>
-                        `;
-                        codesList.appendChild(div);
-                    });
-                }
-            } catch (error) {
-                console.error('Failed to update codes list:', error);
-            }
-        }
-
-        // UI Functions
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-            
-            document.getElementById('chatContainer').style.display = 'none';
-            document.getElementById('gameContainer').style.display = 'none';
-            document.getElementById('codesContainer').style.display = 'none';
-            
-            document.getElementById(`${tab}Container`).style.display = 'block';
-            
-            if (tab === 'codes') {
-                updateCodesList();
+                console.error('Auth check failed:', error);
             }
         }
 
@@ -781,13 +581,25 @@
             
             // Clear forms and errors
             document.querySelectorAll('form').forEach(form => form.reset());
-            document.querySelectorAll('[id$="Error"]').forEach(error => error.style.display = 'none');
+            document.querySelectorAll('.error-message').forEach(error => error.style.display = 'none');
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+            
+            // Hide all containers
+            document.getElementById('chatContainer').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'none';
+            document.getElementById('rewardsContainer').style.display = 'none';
+            
+            // Show selected container
+            document.getElementById(`${tab}Container`).style.display = 'block';
         }
 
         function updateUserDisplay() {
-            document.getElementById('usernameDisplay').textContent = currentUser;
-            document.getElementById('usesCounter').textContent = 
-                `Uses: ${usesRemaining === Infinity ? '∞' : usesRemaining}`;
+            document.getElementById('username').textContent = currentUser;
+            document.getElementById('usageCounter').textContent = `Uses: ${usesRemaining}`;
         }
 
         function showSpinner() {
@@ -804,69 +616,15 @@
             errorElement.style.display = 'block';
         }
 
-        function showNotification(message, type = 'success') {
-            const notification = document.getElementById('notification');
+        function showRewardNotification(message) {
+            const notification = document.getElementById('rewardNotification');
             notification.textContent = message;
-            notification.className = `notification ${type}`;
             notification.classList.add('show');
             
             setTimeout(() => {
                 notification.classList.remove('show');
             }, 3000);
         }
-
-        // Event Listeners
-        document.getElementById('messageInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        document.getElementById('gameCanvas').addEventListener('mousemove', (e) => {
-            if (!gameActive) return;
-            
-            const canvas = document.getElementById('gameCanvas');
-            const rect = canvas.getBoundingClientRect();
-            playerX = Math.max(25, Math.min(375, e.clientX - rect.left));
-        });
-
-        // Mobile touch support
-        document.getElementById('gameCanvas').addEventListener('touchmove', (e) => {
-            if (!gameActive) return;
-            e.preventDefault();
-            
-            const canvas = document.getElementById('gameCanvas');
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            playerX = Math.max(25, Math.min(375, touch.clientX - rect.left));
-        }, { passive: false });
-
-        // Initialize
-        async function checkAuth() {
-            try {
-                const response = await fetch('/check-auth');
-                const data = await response.json();
-                
-                if (data.authenticated) {
-                    currentUser = data.username;
-                    usesRemaining = data.usesRemaining;
-                    highScore = data.gameScore;
-                    
-                    document.getElementById('authContainer').style.display = 'none';
-                    document.getElementById('mainInterface').style.display = 'block';
-                    
-                    updateUserDisplay();
-                    loadChatHistory();
-                    updateCodesList();
-                }
-            } catch (error) {
-                console.error('Auth check failed:', error);
-            }
-        }
-
-        // Run auth check when page loads
-        window.addEventListener('load', checkAuth);
     </script>
 </body>
 </html>

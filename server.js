@@ -63,7 +63,111 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 app.use(cookieParser());
 
-// Rate limiting configuration with custom error handling
+// Custom Firebase Session Store
+class FirebaseSessionStore extends session.Store {
+    constructor(options = {}) {
+        super(options);
+        this.database = getDatabase();
+        this.sessionsRef = ref(this.database, 'sessions');
+    }
+
+    get(sid, callback) {
+        get(child(this.sessionsRef, sid))
+            .then((snapshot) => {
+                if (snapshot.exists()) {
+                    const session = snapshot.val();
+                    if (session.expires && session.expires < Date.now()) {
+                        this.destroy(sid, callback);
+                        return;
+                    }
+                    callback(null, session);
+                } else {
+                    callback(null, null);
+                }
+            })
+            .catch((error) => callback(error));
+    }
+
+    set(sid, session, callback) {
+        const sessionData = {
+            ...session,
+            expires: session.cookie?.expires ? new Date(session.cookie.expires).getTime() : Date.now() + 86400000
+        };
+
+        set(child(this.sessionsRef, sid), sessionData)
+            .then(() => callback(null))
+            .catch((error) => callback(error));
+    }
+
+    destroy(sid, callback) {
+        set(child(this.sessionsRef, sid), null)
+            .then(() => callback(null))
+            .catch((error) => callback(error));
+    }
+
+    clear(callback) {
+        set(this.sessionsRef, null)
+            .then(() => callback(null))
+            .catch((error) => callback(error));
+    }
+
+    length(callback) {
+        get(this.sessionsRef)
+            .then((snapshot) => {
+                const length = snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
+                callback(null, length);
+            })
+            .catch((error) => callback(error));
+    }
+
+    all(callback) {
+        get(this.sessionsRef)
+            .then((snapshot) => {
+                const sessions = snapshot.exists() ? snapshot.val() : {};
+                callback(null, sessions);
+            })
+            .catch((error) => callback(error));
+    }
+
+    touch(sid, session, callback) {
+        if (session && session.cookie && session.cookie.expires) {
+            const expires = new Date(session.cookie.expires).getTime();
+            update(child(this.sessionsRef, sid), { expires })
+                .then(() => callback(null))
+                .catch((error) => callback(error));
+        } else {
+            callback(null);
+        }
+    }
+}
+
+// Session cleanup function
+async function cleanupExpiredSessions() {
+    try {
+        const sessionsRef = ref(database, 'sessions');
+        const snapshot = await get(sessionsRef);
+        const now = Date.now();
+
+        if (snapshot.exists()) {
+            const sessions = snapshot.val();
+            const updates = {};
+            
+            Object.entries(sessions).forEach(([sid, session]) => {
+                if (session.expires && session.expires < now) {
+                    updates[sid] = null;
+                }
+            });
+
+            if (Object.keys(updates).length > 0) {
+                await update(sessionsRef, updates);
+            }
+        }
+    } catch (error) {
+        console.error('Session cleanup error:', error);
+    }
+}
+
+// Rate limiting configuration
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
@@ -78,36 +182,39 @@ const limiter = rateLimit({
         });
     },
     skip: (req) => {
-        // Skip rate limiting for health checks
         return req.path === '/health';
     }
 });
 
 app.use(limiter);
 
-// Session configuration with secure settings
+// Session configuration with Firebase store
 app.use(session({
-    secret: process.env.Apikey || 'your-secret-key',
+    store: new FirebaseSessionStore(),
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: false,
     rolling: true,
     cookie: { 
-        secure: true,
-        sameSite: 'none',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         httpOnly: true
     },
-    name: 'sessionId' // Custom session cookie name
+    name: 'sessionId'
 }));
+
+// Run session cleanup periodically
+setInterval(cleanupExpiredSessions, 24 * 60 * 60 * 1000); // Daily cleanup
 
 // Game and Chat Configuration
 const CONFIG = {
     GAME: {
         REWARD_THRESHOLDS: {
-            BRONZE: { score: 100, uses: 5, cooldown: 1800000 }, // 30 minutes
-            SILVER: { score: 250, uses: 15, cooldown: 3600000 }, // 1 hour
-            GOLD: { score: 500, uses: 30, cooldown: 7200000 }, // 2 hours
-            PLATINUM: { score: 1000, uses: 50, cooldown: null } // No cooldown
+            BRONZE: { score: 100, uses: 5, cooldown: 1800000 },
+            SILVER: { score: 250, uses: 15, cooldown: 3600000 },
+            GOLD: { score: 500, uses: 30, cooldown: 7200000 },
+            PLATINUM: { score: 1000, uses: 50, cooldown: null }
         },
         MAX_DAILY_REWARDS: 10,
         MIN_SCORE: 10,
@@ -128,44 +235,10 @@ const CONFIG = {
     USER: {
         DEFAULT_USES: 5,
         MAX_LOGIN_ATTEMPTS: 5,
-        LOCKOUT_DURATION: 900000, // 15 minutes
-        SESSION_TIMEOUT: 3600000 // 1 hour
+        LOCKOUT_DURATION: 900000,
+        SESSION_TIMEOUT: 3600000
     }
 };
-
-// Firebase Data Management Functions
-async function saveToFirebase(path, data) {
-    try {
-        const dataRef = ref(database, path);
-        await set(dataRef, data);
-        return true;
-    } catch (error) {
-        console.error(`Firebase save error at ${path}:`, error);
-        return false;
-    }
-}
-
-async function getFromFirebase(path) {
-    try {
-        const dataRef = ref(database, path);
-        const snapshot = await get(dataRef);
-        return snapshot.exists() ? snapshot.val() : null;
-    } catch (error) {
-        console.error(`Firebase get error at ${path}:`, error);
-        return null;
-    }
-}
-
-async function updateInFirebase(path, updates) {
-    try {
-        const dataRef = ref(database, path);
-        await update(dataRef, updates);
-        return true;
-    } catch (error) {
-        console.error(`Firebase update error at ${path}:`, error);
-        return false;
-    }
-}
 
 // User Session Management
 const loginAttempts = new Map();
@@ -207,7 +280,6 @@ async function requireAuth(req, res, next) {
         });
     }
 
-    // Verify user exists in Firebase
     const userData = await getFromFirebase(`users/${req.session.username}`);
     if (!userData) {
         req.session.destroy();
@@ -217,12 +289,45 @@ async function requireAuth(req, res, next) {
         });
     }
 
-    // Update last activity
     await updateInFirebase(`users/${req.session.username}`, {
         lastActive: Date.now()
     });
 
     next();
+}
+
+// Firebase Data Management Functions
+async function saveToFirebase(path, data) {
+    try {
+        const dataRef = ref(database, path);
+        await set(dataRef, data);
+        return true;
+    } catch (error) {
+        console.error(`Firebase save error at ${path}:`, error);
+        return false;
+    }
+}
+
+async function getFromFirebase(path) {
+    try {
+        const dataRef = ref(database, path);
+        const snapshot = await get(dataRef);
+        return snapshot.exists() ? snapshot.val() : null;
+    } catch (error) {
+        console.error(`Firebase get error at ${path}:`, error);
+        return null;
+    }
+}
+
+async function updateInFirebase(path, updates) {
+    try {
+        const dataRef = ref(database, path);
+        await update(dataRef, updates);
+        return true;
+    } catch (error) {
+        console.error(`Firebase update error at ${path}:`, error);
+        return false;
+    }
 }
 
 // Activity Monitor Function
@@ -231,7 +336,6 @@ async function monitorActivity(username) {
     const userData = await getFromFirebase(`users/${username}`);
     
     if (userData) {
-        // Reset daily stats at midnight
         const lastActiveDate = new Date(userData.lastActive || 0).setHours(0, 0, 0, 0);
         const today = new Date().setHours(0, 0, 0, 0);
         
@@ -266,13 +370,11 @@ app.post('/register', async (req, res) => {
     }
 
     try {
-        // Check if username exists
         const existingUser = await getFromFirebase(`users/${username}`);
         if (existingUser) {
             return res.json({ success: false, error: 'Username already exists' });
         }
 
-        // Create new user
         const hashedPassword = await require('bcryptjs').hash(password, 10);
         const userData = {
             id: uuidv4(),
@@ -306,7 +408,6 @@ app.post('/register', async (req, res) => {
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
-    // Check account lockout
     if (isAccountLocked(username)) {
         const lockoutRemaining = CONFIG.USER.LOCKOUT_DURATION - 
             (Date.now() - loginAttempts.get(username).lastAttempt);
@@ -337,17 +438,14 @@ app.post('/login', async (req, res) => {
             });
         }
 
-        // Successful login
         updateLoginAttempts(username, true);
         
-        // Update user data
         await updateInFirebase(`users/${username}`, {
             lastLogin: Date.now(),
             lastActive: Date.now(),
             loginCount: (userData.loginCount || 0) + 1
         });
 
-        // Set session
         req.session.username = username;
         
         res.json({
@@ -377,7 +475,6 @@ app.post('/chat', requireAuth, async (req, res) => {
     }
 
     try {
-        // Get user data
         const userData = await getFromFirebase(`users/${username}`);
         
         if (!userData || userData.usesRemaining <= 0) {
@@ -551,13 +648,10 @@ app.get('/user-data', requireAuth, async (req, res) => {
             return res.json({ success: false, error: 'User not found' });
         }
 
-        // Monitor and update daily activities
         await monitorActivity(username);
 
-        // Remove sensitive data
         const { password, ...safeData } = userData;
 
-        // Calculate time until next rewards
         const nextRewards = {};
         if (userData.lastReward) {
             Object.entries(CONFIG.GAME.REWARD_THRESHOLDS).forEach(([tier, data]) => {
@@ -585,30 +679,15 @@ app.get('/user-data', requireAuth, async (req, res) => {
     }
 });
 
-// Clear Chat History Route
-app.post('/clear-chat', requireAuth, async (req, res) => {
-    const username = req.session.username;
-
-    try {
-        await updateInFirebase(`users/${username}/chatHistory`, []);
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Clear chat error:', error);
-        res.json({ success: false, error: 'Failed to clear chat history' });
-    }
-});
-
-// User Settings Route
-app.post('/update-settings', requireAuth, async (req, res) => {
-    const username = req.session.username;
-    const { settings } = req.body;
-
-    try {
-        await updateInFirebase(`users/${username}/settings`, settings);
-        res.json({ success: true, settings });
-    } catch (error) {
-        console.error('Settings update error:', error);
-        res.json({ success: false, error: 'Failed to update settings' });
+// Check Auth Route
+app.get('/check-auth', (req, res) => {
+    if (req.session.username) {
+        res.json({
+            authenticated: true,
+            username: req.session.username
+        });
+    } else {
+        res.json({ authenticated: false });
     }
 });
 
@@ -651,36 +730,6 @@ app.use((err, req, res, next) => {
         message: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
 });
-
-// Clean up old data periodically
-setInterval(async () => {
-    try {
-        const users = await getFromFirebase('users');
-        const now = Date.now();
-
-        for (const [username, userData] of Object.entries(users)) {
-            // Clean up old chat history
-            if (userData.chatHistory) {
-                userData.chatHistory = userData.chatHistory.filter(chat => 
-                    (now - chat.timestamp) < (CONFIG.CHAT.HISTORY_RETENTION_DAYS * 24 * 60 * 60 * 1000)
-                );
-            }
-
-            // Reset daily stats if needed
-            const lastActiveDate = new Date(userData.lastActive || 0).setHours(0, 0, 0, 0);
-            const today = new Date().setHours(0, 0, 0, 0);
-            
-            if (lastActiveDate < today) {
-                userData.dailyRewards = 0;
-                userData.dailyUses = 0;
-            }
-
-            await updateInFirebase(`users/${username}`, userData);
-        }
-    } catch (error) {
-        console.error('Cleanup error:', error);
-    }
-}, 24 * 60 * 60 * 1000); // Run daily
 
 // Start server
 const PORT = process.env.PORT || 3000;

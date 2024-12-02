@@ -510,121 +510,398 @@
         <div id="rewardNotification" class="reward-notification"></div>
     </div>
 
-    <script>
-        // Global Variables
-        let currentUser = null;
-        let gameActive = false;
-        let gameScore = 0;
-        let playerX = 200;
-        let objects = [];
-        let usesRemaining = 0;
-        let highScore = 0;
+   <script>
+    // Global Variables
+    let currentUser = null;
+    let gameActive = false;
+    let gameScore = 0;
+    let playerX = 200;
+    let objects = [];
+    let usesRemaining = 0;
+    let highScore = 0;
 
-        // Event Listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            // Initialize event listeners
-            document.getElementById('messageInput').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                }
+    // Authentication Functions
+    async function handleLogin(event) {
+        event.preventDefault();
+        const username = document.getElementById('loginUsername').value;
+        const password = document.getElementById('loginPassword').value;
+
+        showSpinner();
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+                credentials: 'include'
             });
 
-            document.getElementById('gameCanvas').addEventListener('mousemove', (e) => {
-                if (!gameActive) return;
-                const canvas = document.getElementById('gameCanvas');
-                const rect = canvas.getBoundingClientRect();
-                playerX = Math.max(25, Math.min(375, e.clientX - rect.left));
-            });
+            const data = await response.json();
 
-            // Mobile touch support
-            document.getElementById('gameCanvas').addEventListener('touchmove', (e) => {
-                if (!gameActive) return;
-                e.preventDefault();
-                const canvas = document.getElementById('gameCanvas');
-                const rect = canvas.getBoundingClientRect();
-                const touch = e.touches[0];
-                playerX = Math.max(25, Math.min(375, touch.clientX - rect.left));
-            }, { passive: false });
-
-            // Check authentication status
-            checkAuth();
-        });
-
-        async function checkAuth() {
-            try {
-                const response = await fetch('/check-auth');
-                const data = await response.json();
+            if (data.success) {
+                currentUser = username;
+                usesRemaining = data.usesRemaining;
+                highScore = data.gameScore;
                 
-                if (data.authenticated) {
-                    currentUser = data.username;
-                    usesRemaining = data.usesRemaining;
-                    highScore = data.gameScore;
-                    
-                    document.getElementById('authContainer').style.display = 'none';
-                    document.getElementById('mainInterface').style.display = 'block';
-                    
-                    updateUserDisplay();
-                    loadChatHistory();
+                document.getElementById('authContainer').style.display = 'none';
+                document.getElementById('mainInterface').style.display = 'block';
+                
+                updateUserDisplay();
+                loadChatHistory();
+                showNotification('Login successful', 'success');
+            } else {
+                showError('loginError', data.error);
+            }
+        } catch (error) {
+            showError('loginError', 'Login failed. Please try again.');
+        } finally {
+            hideSpinner();
+        }
+    }
+
+    async function handleRegister(event) {
+        event.preventDefault();
+        const username = document.getElementById('registerUsername').value;
+        const password = document.getElementById('registerPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+
+        if (password !== confirmPassword) {
+            showError('registerError', 'Passwords do not match');
+            return;
+        }
+
+        showSpinner();
+        try {
+            const response = await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                showNotification('Registration successful! Please login.', 'success');
+                toggleForms();
+                document.getElementById('loginUsername').value = username;
+            } else {
+                showError('registerError', data.error);
+            }
+        } catch (error) {
+            showError('registerError', 'Registration failed. Please try again.');
+        } finally {
+            hideSpinner();
+        }
+    }
+
+    async function logout() {
+        try {
+            await fetch('/logout', { method: 'POST' });
+            currentUser = null;
+            document.getElementById('authContainer').style.display = 'block';
+            document.getElementById('mainInterface').style.display = 'none';
+            resetGame();
+            showNotification('Logged out successfully', 'success');
+        } catch (error) {
+            showNotification('Logout failed', 'error');
+        }
+    }
+
+    // Chat Functions
+    async function sendMessage() {
+        if (usesRemaining <= 0) {
+            showNotification('No uses remaining. Play games to earn more!', 'error');
+            return;
+        }
+
+        const messageInput = document.getElementById('messageInput');
+        const message = messageInput.value.trim();
+        
+        if (!message) return;
+
+        messageInput.value = '';
+        addMessage('You: ' + message, 'user-message');
+
+        showSpinner();
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                addMessage('AI: ' + data.response, 'bot-message');
+                usesRemaining = data.usesRemaining;
+                updateUserDisplay();
+            } else {
+                showNotification(data.error, 'error');
+            }
+        } catch (error) {
+            showNotification('Failed to send message', 'error');
+        } finally {
+            hideSpinner();
+        }
+    }
+
+    function addMessage(message, className) {
+        const chatbox = document.getElementById('chatbox');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ' + className;
+        messageDiv.textContent = message;
+        chatbox.appendChild(messageDiv);
+        chatbox.scrollTop = chatbox.scrollHeight;
+    }
+
+    async function loadChatHistory() {
+        try {
+            const response = await fetch('/user-data');
+            const data = await response.json();
+            
+            if (data.success && data.data.chatHistory) {
+                const chatbox = document.getElementById('chatbox');
+                chatbox.innerHTML = '';
+                
+                data.data.chatHistory.forEach(chat => {
+                    addMessage('You: ' + chat.message, 'user-message');
+                    addMessage('AI: ' + chat.response, 'bot-message');
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load chat history:', error);
+        }
+    }
+
+    // Game Functions
+    function startGame() {
+        if (gameActive) return;
+        
+        gameActive = true;
+        gameScore = 0;
+        objects = [];
+        document.getElementById('startGameBtn').disabled = true;
+        document.getElementById('currentScore').textContent = '0';
+        updateGameProgress();
+        gameLoop();
+        spawnObjects();
+    }
+
+    function gameLoop() {
+        if (!gameActive) return;
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw player
+        ctx.fillStyle = '#1a73e8';
+        ctx.fillRect(playerX - 25, 350, 50, 10);
+        
+        // Update and draw objects
+        for (let i = objects.length - 1; i >= 0; i--) {
+            const obj = objects[i];
+            obj.y += 3;
+            
+            ctx.beginPath();
+            ctx.arc(obj.x, obj.y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = obj.type === 'good' ? '#4caf50' : '#f44336';
+            ctx.fill();
+            
+            if (obj.y > 350 && obj.y < 370) {
+                if (Math.abs(obj.x - playerX) < 35) {
+                    if (obj.type === 'good') {
+                        gameScore += 10;
+                        updateGameProgress();
+                    } else {
+                        endGame();
+                    }
+                    objects.splice(i, 1);
                 }
-            } catch (error) {
-                console.error('Auth check failed:', error);
+            }
+            
+            if (obj.y > 400) {
+                objects.splice(i, 1);
             }
         }
+        
+        requestAnimationFrame(gameLoop);
+    }
 
-        function toggleForms() {
-            const loginForm = document.getElementById('loginForm');
-            const registerForm = document.getElementById('registerForm');
+    function spawnObjects() {
+        if (!gameActive) return;
+        
+        const obj = {
+            x: Math.random() * 360 + 20,
+            y: 0,
+            type: Math.random() > 0.3 ? 'good' : 'bad'
+        };
+        
+        objects.push(obj);
+        setTimeout(spawnObjects, 1000);
+    }
+
+    async function endGame() {
+        gameActive = false;
+        document.getElementById('startGameBtn').disabled = false;
+        
+        try {
+            const response = await fetch('/game-score', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ score: gameScore })
+            });
+
+            const data = await response.json();
             
-            loginForm.style.display = loginForm.style.display === 'none' ? 'block' : 'none';
-            registerForm.style.display = registerForm.style.display === 'none' ? 'block' : 'none';
+            if (data.success) {
+                usesRemaining = data.usesRemaining;
+                highScore = Math.max(highScore, data.highScore);
+                updateUserDisplay();
+                updateGameProgress();
+                
+                if (data.rewardsEarned && data.rewardsEarned.length > 0) {
+                    data.rewardsEarned.forEach(reward => {
+                        showNotification(`New reward earned: ${reward.tier}! +${reward.uses} uses`, 'success');
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Failed to submit score:', error);
+        }
+    }
+
+    function resetGame() {
+        gameActive = false;
+        gameScore = 0;
+        objects = [];
+        if (document.getElementById('startGameBtn')) {
+            document.getElementById('startGameBtn').disabled = false;
+        }
+        updateGameProgress();
+    }
+
+    function updateGameProgress() {
+        document.getElementById('currentScore').textContent = gameScore;
+        document.getElementById('highScore').textContent = highScore;
+        
+        const nextThreshold = getNextThreshold(gameScore);
+        if (nextThreshold) {
+            document.getElementById('nextReward').textContent = nextThreshold - gameScore;
+        }
+    }
+
+    function getNextThreshold(score) {
+        const thresholds = [100, 250, 500, 1000];
+        return thresholds.find(t => t > score) || null;
+    }
+
+    // UI Functions
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+        
+        document.getElementById('chatContainer').style.display = 'none';
+        document.getElementById('gameContainer').style.display = 'none';
+        document.getElementById('rewardsContainer').style.display = 'none';
+        
+        document.getElementById(`${tab}Container`).style.display = 'block';
+    }
+
+    function toggleForms() {
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        
+        loginForm.style.display = loginForm.style.display === 'none' ? 'block' : 'none';
+        registerForm.style.display = registerForm.style.display === 'none' ? 'block' : 'none';
+        
+        // Clear forms and errors
+        document.querySelectorAll('form').forEach(form => form.reset());
+        document.querySelectorAll('[id$="Error"]').forEach(error => error.style.display = 'none');
+    }
+
+    function updateUserDisplay() {
+        document.getElementById('username').textContent = currentUser;
+        document.getElementById('usageCounter').textContent = 
+            `Uses: ${usesRemaining === Infinity ? '∞' : usesRemaining}`;
+    }
+
+    function showSpinner() {
+        document.getElementById('spinner').style.display = 'block';
+    }
+
+    function hideSpinner() {
+        document.getElementById('spinner').style.display = 'none';
+    }
+
+    function showError(elementId, message) {
+        const errorElement = document.getElementById(elementId);
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+
+    function showNotification(message, type = 'success') {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.className = `notification ${type}`;
+        notification.classList.add('show');
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+        }, 3000);
+    }
+
+    // Event Listeners
+    document.getElementById('messageInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    document.getElementById('gameCanvas').addEventListener('mousemove', (e) => {
+        if (!gameActive) return;
+        
+        const canvas = document.getElementById('gameCanvas');
+        const rect = canvas.getBoundingClientRect();
+        playerX = Math.max(25, Math.min(375, e.clientX - rect.left));
+    });
+
+    // Mobile touch support
+    document.getElementById('gameCanvas').addEventListener('touchmove', (e) => {
+        if (!gameActive) return;
+        e.preventDefault();
+        
+        const canvas = document.getElementById('gameCanvas');
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        playerX = Math.max(25, Math.min(375, touch.clientX - rect.left));
+    }, { passive: false });
+
+    // Initialize
+    async function checkAuth() {
+        try {
+            const response = await fetch('/check-auth');
+            const data = await response.json();
             
-            // Clear forms and errors
-            document.querySelectorAll('form').forEach(form => form.reset());
-            document.querySelectorAll('.error-message').forEach(error => error.style.display = 'none');
+            if (data.authenticated) {
+                currentUser = data.username;
+                usesRemaining = data.usesRemaining;
+                highScore = data.gameScore;
+                
+                document.getElementById('authContainer').style.display = 'none';
+                document.getElementById('mainInterface').style.display = 'block';
+                
+                updateUserDisplay();
+                loadChatHistory();
+            }
+        } catch (error) {
+            console.error('Auth check failed:', error);
         }
+    }
 
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
-            
-            // Hide all containers
-            document.getElementById('chatContainer').style.display = 'none';
-            document.getElementById('gameContainer').style.display = 'none';
-            document.getElementById('rewardsContainer').style.display = 'none';
-            
-            // Show selected container
-            document.getElementById(`${tab}Container`).style.display = 'block';
-        }
-
-        function updateUserDisplay() {
-            document.getElementById('username').textContent = currentUser;
-            document.getElementById('usageCounter').textContent = `Uses: ${usesRemaining}`;
-        }
-
-        function showSpinner() {
-            document.getElementById('spinner').style.display = 'block';
-        }
-
-        function hideSpinner() {
-            document.getElementById('spinner').style.display = 'none';
-        }
-
-        function showError(elementId, message) {
-            const errorElement = document.getElementById(elementId);
-            errorElement.textContent = message;
-            errorElement.style.display = 'block';
-        }
-
-        function showRewardNotification(message) {
-            const notification = document.getElementById('rewardNotification');
-            notification.textContent = message;
-            notification.classList.add('show');
-            
-            setTimeout(() => {
-                notification.classList.remove('show');
-            }, 3000);
-        }
-    </script>
+    // Run auth check when page loads
+    window.addEventListener('load', checkAuth);
+</script>
 </body>
 </html>
